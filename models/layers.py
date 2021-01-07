@@ -114,9 +114,9 @@ class ResBlockGenerator(nn.Module):
         if n_classes == 0:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(hidden_channels)
-        else
-            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= SN,fix_scale=cbn_fixed_Var)
-            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=SN,fix_scale=cbn_fixed_Var)
+        else:
+            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= SN)
+            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=SN)
 
         if leak >0:
             self.activation = nn.LeakyReLU(leak)
