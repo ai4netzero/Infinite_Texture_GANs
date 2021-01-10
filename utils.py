@@ -36,23 +36,25 @@ config.update(config_file.config)
 def prepare_parser():
     parser = argparse.ArgumentParser()
                   
-    # data settings
-    parser.add_argument('--data_path', type=str, default=None
-                        ,help = 'path to the training set if None the default path will be used')        
+    # data settings     
     parser.add_argument('--data', type=str, default='channels'
-                       ,help = 'type of data {channels,propchannels(channels with 3 diffiernt proportions)'
-                        'orchannel (channels with 3 diffiernt orientation)'
-                        'rgbchannels (channels with multiple facies')
-                        
+                       ,help = 'type of data')
+    parser.add_argument('--data_path', type=str, default='../datasets/prop_channels_train/'
+                       ,help = 'data path')
+    parser.add_argument('--labels_path', type=str, default='datasets/prop_labels.csv'
+                       ,help = 'labels path')
+    parser.add_argument('--data_ext', type=str, default='txt'
+                       ,help = 'data extension txt, png')
+
     # models settings
     parser.add_argument('--G_model', type=str, default='residual_GAN'
-                        ,help = 'Generator Model can be residual_GAN, cnn_GAN, ...')
+                        ,help = 'Generator Model can be residual_GAN, dcgan, ...')
     parser.add_argument('--D_model', type=str, default='residual_GAN'
-                        ,help = 'Discriminator Model can be residual_GAN, cnn_GAN, ...')
+                        ,help = 'Discriminator Model can be residual_GAN, dcgan, sngan,...')
     parser.add_argument('--cgan',action='store_true',default=False
-                        ,help = 'Use conditional GAN if True')
+                        ,help = 'Use conditional GAN if True (only implmented in residual_GAN)')
     parser.add_argument('--att',action='store_true',default=False
-                        ,help = 'Use Attention if True')
+                        ,help = 'Use Attention if True  (only implmented in residual_GAN)')
     parser.add_argument('--img_ch', type=int, default=3
                         ,help = 'the number of image channels 1 for grayscale 3 for RGB')
     parser.add_argument('--G_ch', type=int, default=52
@@ -69,15 +71,9 @@ def prepare_parser():
                        ,help = 'apply spectral normalization in discriminator')
     parser.add_argument('--spec_norm_G', default=False,action='store_true'
                        ,help = 'apply spectral normalization in generator')
-    #parser.add_argument('--Patch_GAN', default=False,action='store_true'
-    #                   ,help = 'Use Patch based discriminator')
-    #parser.add_argument('--Double_D', default=False,action='store_true'
-    #                   ,help = 'Use double discriminators')
-    parser.add_argument('--y_layers', type=int, default=1
-                       ,help = 'number condition mlp layers before concatentation ')
+    parser.add_argument('--n_layers_D', type=int, default=3
+                       ,help = 'number of layers used in discriminator of dcgan')
 
-    parser.add_argument('--cbn_fixed_Var', default=False,action='store_true'
-                       ,help = 'apply cbn with fixed variance in the generator')
     # Double discriminators parameters
 
     # optimizers settings
@@ -124,8 +120,7 @@ def prepare_parser():
      
     parser.add_argument('--print_acc_t',action='store_true' , default=False
                        , help = 'print the area of conn. comp. in the channels')
-    parser.add_argument('--acc_cond_list', nargs='+', default=None,type=float
-                        ,help='List of conditions values for acc_t computation')          
+
     # GPU settings
     parser.add_argument('--ngpu', type=int, default=1
                         ,help = 'number of gpus to be used')                                     
@@ -142,28 +137,20 @@ def prepare_parser():
                         ,help='conditiong method concat for concatentation/cbn for conditional batch normalization')
     parser.add_argument('--n_cl', type=int, default=0
                        ,help = 'number of classes, 1 for continious conditioning')
-    parser.add_argument('--n_cl1', type=int, default=0
-                       ,help = 'number of classes in the second condition if there is')
     parser.add_argument('--real_cond_list', nargs='+', default=None,type=float
                         ,help='List of conditions values for the real samples e.g. 0.25 0.30 0.35 if not provided it will be  0 1 2 ..')   
     parser.add_argument('--discrete',action='store_true' , default=False
                        ,help = 'if True Sample only discrete labels from min_label to max_label')  
     parser.add_argument('--c_list', nargs='+', default=None,type=float
-                        ,help='list of conditions to be sampled,if provided')                                                                                   
+                        ,help='list of conditions to be sampled, if provided')                                                                                   
     parser.add_argument('--min_label', type=float, default=0
                         ,help='minimum label for conditions')
     parser.add_argument('--max_label', type=float, default=None
                         ,help='maximum label for conditions, if None will be set num of classes')
     parser.add_argument('--ohe',action='store_true' , default=False
                        ,help = 'use one hot encoding for conditioning')
-    parser.add_argument('--img_cond',action='store_true' , default=False
-                       ,help = 'use images for conditioning')
     parser.add_argument('--SN_y', action='store_true' , default=False
                         ,help='apply SN to the condition linear layer')
-    #parser.add_argument('--min_v', type=int, default=0
-    #                    ,help='minimum index for ohe conditions')
-    #parser.add_argument('--max_v', type=int, default=None
-    #                    ,help='maximum index for ohe conditions, if None it will be set to the number of classes')
     return parser
 
 
@@ -214,13 +201,27 @@ def prepare_seed(args):
     print("Random Seed: ", seed)
     return seed
    
-def weights_init(m):
+
+
+def init_weight(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
-        nn.init.normal_(m.weight.data, 0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
-        nn.init.normal_(m.weight.data, 1.0, 0.02)
-        nn.init.constant_(m.bias.data, 0)
+        nn.init.orthogonal_(m.weight, gain=1)
+        if m.bias is not None:
+            m.bias.data.zero_()
+            
+    elif classname.find('Batch') != -1:
+        m.weight.data.normal_(1,0.02)
+        m.bias.data.zero_()
+    
+    elif classname.find('Linear') != -1:
+        nn.init.orthogonal_(m.weight, gain=1)
+        if m.bias is not None:
+            m.bias.data.zero_()
+    
+    elif classname.find('Embedding') != -1:
+        nn.init.orthogonal_(m.weight, gain=1)
+        
 
 #dataset
 def prepare_data(args):
@@ -240,38 +241,19 @@ def prepare_data(args):
                                        transforms.ToTensor(),
                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                    ]))
-        dataloader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size,
-                                                 shuffle=True, num_workers=2)
 
     elif args.data == 'channels':
-        from datasets import Channels
-        train_data = Channels.Channels(path = args.data_path)
-        dataloader = torch.utils.data.DataLoader(train_data,
-                               shuffle=True, batch_size=args.batch_size,
-                               num_workers=4,pin_memory=True)
-    elif args.data == 'rgbchannels':
-        from datasets import RGBChannels
-        train_data = RGBChannels.RGBChannels(path = args.data_path)
-        dataloader = torch.utils.data.DataLoader(train_data,
-                               shuffle=True, batch_size=args.batch_size,
-                               num_workers=4,pin_memory=True)
+        from datasets import channels_datasets
+        train_data = channels_datasets.Channels(path = args.data_path,labels_path=args.labels_path,ext = arg.data_ext)
 
-    elif args.data == 'propchannels':
-        from datasets import propchannels
-        train_data = propchannels.propchannels(path = args.data_path)
-        dataloader = torch.utils.data.DataLoader(train_data,
-                               shuffle=True, batch_size=args.batch_size,
-                               num_workers=16,pin_memory=True)
-
-    elif args.data == 'orchannels':
-        from datasets import orchannels
-        train_data = orchannels.orchannels(path = args.data_path)
-        dataloader = torch.utils.data.DataLoader(train_data,
-                               shuffle=True, batch_size=args.batch_size,
-                               num_workers=16,pin_memory=True)
     else:
         print('no data named :',args.data)
         exit()
+
+    dataloader = torch.utils.data.DataLoader(train_data,
+                       shuffle=True, batch_size=args.batch_size,
+                       num_workers=4)
+
     print("Finished data loading")    
     return dataloader,train_data
 
@@ -279,56 +261,39 @@ def prepare_data(args):
             
 def prepare_models(args,n_cl = 0,device = 'cpu',only_G = False):           
     #model
-    if args.G_model == 'cnn_GAN':
-        netG = generators.CNN_Generator(args.zdim,img_ch=args.img_ch,base_ch= args.G_ch).to(device)
+    if args.G_model == 'dcgan':
+        netG = generators.DC_Generator(args.zdim,img_ch=args.img_ch,base_ch= args.G_ch).to(device)
         netG.apply(weihts_init)
 
     elif args.G_model == 'residual_GAN':
         netG = generators.Res_Generator(args.zdim,img_ch=args.img_ch,n_classes = n_cl
-                                        ,ch = args.G_ch,leak = args.leak_G,att = args.att
+                                        ,base_ch = args.G_ch,leak = args.leak_G,att = args.att
                                         ,SN = args.spec_norm_G
-                                        ,cond_method = args.G_cond_method
-                                        ,cbn_fixed_Var = args.cbn_fixed_Var).to(device)
+                                        ,cond_method = args.G_cond_method).to(device)
 
-    elif args.G_model == 'SPADE_GAN':
-        netG = generators.SPADE_Generator(args.zdim,img_ch=args.img_ch,n_classes = n_cl
-                                        ,ch = args.G_ch,leak = args.leak_G,att = args.att
-                                        ,SN = args.spec_norm_G).to(device)
     if only_G:
         return netG
 
-    if args.D_model == 'cnn_GAN':
-        netD = discriminators.CNN_Discriminator(img_ch=args.img_ch,base_ch= args.D_ch,spectral_norm = args.spec_norm_D
-                                     ,leak = args.leak_D).to(device)  
-        netD.apply(weights_init)                    
+    if args.D_model == 'dcgan':
+        netD = discriminators.DC_Discriminator(img_ch=args.img_ch
+                                             ,base_ch= args.D_ch
+                                             ,leak = args.leak_D
+                                             ,n_layers = args.n_layers_D).to(device)  
+        netD.apply(weights_init)
+
+    elif args.D_model == 'cnn_sngan':
+        netD = discriminators.SN_Discriminator(img_ch=args.img_ch
+                                            ,base_ch= args.D_ch
+                                            ,leak = args.leak_D
+                                            ,SN=args.spec_norm_D).to(device)  
+        netD.apply(weights_init)                            
 
     elif args.D_model == 'residual_GAN':
-        netD = discriminators.Res_Discriminator(img_ch=args.img_ch,n_classes = n_cl,ch = args.D_ch
+        netD = discriminators.Res_Discriminator(img_ch=args.img_ch,n_classes = n_cl,base_ch = args.D_ch
                                     ,leak = args.leak_D,att = args.att
                                     ,cond_method = args.D_cond_method
                                     ,SN = args.spec_norm_D
-                                    ,y_layers = args.y_layers
-                                    ,SN_y = args.SN_y).to(device)   
-
-    elif  args.D_model == 'cnn_PatchGAN':
-        netD = discriminators.Patch_CNN_Discriminator(img_ch = args.img_ch,ch =args.D_ch,n_classes = n_cl).to(device)                                            
-
-    elif  args.D_model == 'Res_PatchGAN':
-        netD = discriminators.Res_Discriminator(img_ch=args.img_ch,n_classes = n_cl,ch = args.D_ch
-                                    ,leak = args.leak_D,att = args.att
-                                    ,cond_method = args.D_cond_method
-                                    ,SN = args.spec_norm_D
-                                    ,y_layers = args.y_layers
-                                    ,SN_y = args.SN_y
-                                    ,patch = True).to(device)   
-
-    elif args.D_model == 'Double_D':
-        netD = discriminators.Double_Discriminator(config,img_ch=args.img_ch,n_classes = n_cl
-                                    ,leak = args.leak_D
-                                    ,cond_method = args.D_cond_method
-                                    ,SN = args.spec_norm_D
-                                    ,SN_y = args.SN_y
-                                    ,separate_loss = args.separate_loss).to(device)    
+                                    ,SN_y = args.SN_y).to(device)                                            
 
     return netG,netD
 
@@ -388,127 +353,28 @@ def sample_pseudo_labels(args,num_classes,batch_size,device):
         return y,y
 
     # discrete conditions
-    if args.discrete:
+    elif args.discrete:
         y =  torch.randint(low=int(args.min_label), high=int(max_value), size=(batch_size,1)).to(device)
-        if args.ohe:
-            y_ohe = torch.eye(num_classes)[y].to(device)
-            return y_ohe,y_ohe
-        else:
-            y = y.type(torch.long)
-            return y,y
+        return y,y
+    elif args.ohe:
+        y =  torch.randint(low=int(args.min_label), high=int(max_value), size=(batch_size,1)).to(device)
+        y_ohe = torch.eye(num_classes)[y].to(device)
+        return y_ohe,y_ohe
 
     else: # continious conditions
         y = (args.max_label - args.min_label) * torch.rand(batch_size,1) + args.min_label
-        if args.ohe:
-            y = cont_2_ohe(y,num_classes)
         y = y.to(device)
         return y,y
-
-
-def rotate_cv(image, angle, scale = 1.0):
-    (h, w) = image.shape[:2]
-
-    center = (w / 2, h / 2)
-
-    # Perform the rotation
-    M = cv2.getRotationMatrix2D(center, angle, scale)
-    rotated = cv2.warpAffine(image, M, (w, h))
-
-    return rotated
-
-
-def prepeare_img_condition():
-    v = torch.zeros(64,64)
-    v[:,8:12] = 1
-    v[:,23:27] = 1
-    v[:,39:43] = 1
-    v[:,55:59] = 1
-    h = torch.zeros(64,64)
-    h[8:12,:] = 1
-    h[23:27,:] = 1
-    h[39:43,:] = 1
-    h[55:59,:] = 1
-    ##h = rotate_cv(v.numpy(),-90,1.1)
-    #h = np.round(h)
-    #h = torch.tensor(h)
-    i = rotate_cv(v.numpy(),-45,1.3)
-    i = np.round(i)
-    i = torch.tensor(i)
-    return torch.cat((v.unsqueeze(0),i.unsqueeze(0),h.unsqueeze(0)),0)
-
-
-def disc_2_img(y,device):
-    angles = prepeare_img_condition().to(device)
-    y_angles = torch.empty(y.size(0),1,64,64).to(device)
-    y_angles[y==0] = angles[0].unsqueeze(0)
-    y_angles[y==1] = angles[1].unsqueeze(0)
-    y_angles[y==2] = angles[2].unsqueeze(0)
-    y_angles[y_angles==0] = -1
-    return y_angles
-
-def cont_2_img_hv(y,device,pre =1,new = 1.3):
-    v = torch.zeros(64,64)
-    v[:,8:12] = 1
-    v[:,23:27] = 1
-    v[:,39:43] = 1
-    v[:,55:59] = 1
-    h = torch.zeros(64,64)
-    h[8:12,:] = 1
-    h[23:27,:] = 1
-    h[39:43,:] = 1
-    h[55:59,:] = 1
-    y_angles = torch.empty(y.size(0),1,64,64).to(device)
-    for i,angle in enumerate(y):
-        angle = angle.item()
-        if angle>=0 and angle<=45:
-            o = rotate_cv(v.numpy(),-angle,((pre-new)/(-45))*angle + pre)
-        elif  angle>45 and angle<=90:
-            o = rotate_cv(h.numpy(),90-angle,((pre-new)/(45))*(angle-90) + pre)
-        o = np.round(o)
-        o = torch.tensor(o).to(device)
-        y_angles[i] = o.unsqueeze(0)
-    y_angles[y_angles==0] = -1
-    return y_angles
-
-
-def cont_2_ohe(y,num_classes,device='cpu'):
-    y_c = torch.ceil(y)
-    y_f = torch.floor(y)
-    y_ohe_c = torch.eye(num_classes)[y_c.long()]
-    y_ohe_f = torch.eye(num_classes)[y_f.long()]
-    alpha = y-y_f
-    y_ohe = y_ohe_c * alpha[:, None]+y_ohe_f * (1-alpha[:, None])
-    return y_ohe.to(device)
-
 
 def disc_2_ohe(y,num_classes,device):
     y_ohe = torch.eye(num_classes)[y].to(device)
     return y_ohe
 
-def disc_2_cont(y,c_list,device):
+def disc_2_cont(y,c_list,device): # convert discrete label to label in c_list
     for i,v in enumerate(c_list):
         y[y==i] = v
     y = y.unsqueeze(1)
     return y    
-
-def adaptive_adv_labels(args,y_vector,device,sigma = 0.05,pre_value = 1,new_value = 0.85):
-    max_label = args.max_label
-    min_label = args.min_label
-    mid_label = (max_label+min_label)/2
-    mid_min = (min_label+mid_label)/2
-    mid_max = (max_label+mid_label)/2
-    b_size = y_vector.size(0)
-    adv_labels = torch.full((b_size, 1), pre_value, device=device)
-    for i,v in enumerate(y_vector):
-        if v >= min_label and v < mid_min:
-            adv_labels[i] = ((pre_value-new_value)/(min_label-mid_min))*(v-min_label) +pre_value
-        elif v >=  mid_min and v < mid_label:
-            adv_labels[i] = ((pre_value-new_value)/(mid_label-mid_min))*(v-mid_label) +pre_value
-        elif v >= mid_label and v < mid_max:
-            adv_labels[i] = ((pre_value-new_value)/(mid_label-mid_max))*(v-mid_label) +pre_value
-        elif v >= mid_max and v <= max_label:
-            adv_labels[i] = ((pre_value-new_value)/(max_label-mid_max))*(v-max_label) +pre_value
-    return adv_labelss
     
 #generate fake images
 def sample_from_gen(args,b_size, zdim, num_classes,netG,device ='cpu',truncated = 0): 
@@ -523,17 +389,6 @@ def sample_from_gen(args,b_size, zdim, num_classes,netG,device ='cpu',truncated 
     #labels
     if num_classes>0:
         y_D,y_G = sample_pseudo_labels(args,num_classes,b_size,device)
-        if args.img_cond:
-            #print(y_D)
-            if args.discrete:
-                y_D = disc_2_img(y_D,device) # 0 to img with 0 deg,1 to img with 45 degs,..
-            else:
-                y_D = cont_2_img_hv(y_D,device) # img with y_D degs   
-            #save_image(y_D[0],'1.png')
-            #save_image(y_D[1],'2.png')         
-            #exit()
-            y_G = y_D
-            #exit()
     else:
         y_D,y_G = None,None   
     fake = netG(z, y_G)
@@ -625,81 +480,6 @@ def save_grid(args,netG,device,nrows=3,ncol=3,out_path = 'plot'):
         plt.yticks([])
     fig.savefig(out_path+'.png')
 
-def acc_t(netG,args,t_a=100,N=200,y_list =None ,device = 'cpu'):
-    if y_list is None:
-        y_list = args.acc_cond_list 
-    netG.eval()
-    z = torch.randn(N, 128).to(device=device,non_blocking=True)
-    acc_t_y = []
-    for i,x in enumerate(y_list):
-        y = (x - x) * torch.rand(N) + x
-        y =  y.unsqueeze(1)
-        #y = cont_2_img_hv(y,device,new=1.3)
-        with torch.no_grad():
-            imgs = netG(z,y.to(device=device)).cpu().squeeze(1)
-            AC= []
-            for k in range(N):
-                img = imgs[k].numpy()
-                AC_img = area_of_components(img)
-                AC.extend(AC_img)
-        if len(AC)==0:
-            print(AC_img)
-            acc_t_y.append(None)
-        else:         
-            acc_t = sum(i <t_a for i in AC)/len(AC)*100
-            acc_t_y.append(acc_t)
-
-    return acc_t_y
-
-def label_components(img,face = 1):
-    c_l = 0
-    l = np.zeros_like(img)
-    q = []
-    for i in range(np.size(img,0)):
-        for j in range(np.size(img,1)):
-            p = img[i,j]
-            if p ==face and l[i,j] == 0:
-                c_l += 1
-                l[i,j] = c_l
-                q.append((i,j))
-            while len(q) != 0:
-                #print(q)    
-                #return q
-                e = q.pop()
-                n = get_distant_pixels(e[0],e[1],1,high = np.size(img,1)-1)
-                #print(n)
-                #return n
-                for pix in n:
-                    if img[pix[0],pix[1]] ==face and l[pix[0],pix[1]] ==0:
-                        l[pix[0],pix[1]] = c_l
-                        q.append((pix[0],pix[1]))
-                        
-                #return q
-    return l
-
-def get_distant_pixels(i,j,d,low = 0,high = 63):
-    l = set()
-    for dis in range(-d,d+1):
-        if i+dis>=low and i+dis<=high and j+d>=low and j+d<=high:
-            l.add((i+dis,j+d))
-    for dis in range(-d,d+1):
-        if i+dis>=low and i+dis<=high and j-d>=low and j-d<=high:
-            l.add((i+dis,j-d))
-    for dis in range(-d,d+1):
-        if i+d>=low and i+d<=high and j+dis>=low and j+dis<=high:
-            l.add((i+d,j+dis))
-    for dis in range(-d,d+1):
-        if i-d>=low and i-d<=high and j+dis>=low and j+dis<=high:
-            l.add((i-d,j+dis))
-    return l
-
-def area_of_components(img,face = 1):
-    l_c = label_components(img,face = face)
-    no_comp = len(np.unique(l_c))-1
-    areas = []
-    for comp in range(1,no_comp+1):
-        areas.append(np.count_nonzero(l_c == comp))
-    return areas
 
 def elapsed_time(start_time):
     return time.time() - start_time
