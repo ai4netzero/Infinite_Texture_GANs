@@ -24,12 +24,7 @@ import cv2
 import matplotlib.animation as animation
 from IPython.display import HTML
 import sys
-import config_file
 from models import generators,discriminators
-
-config = {}
-
-config.update(config_file.config)
 
 
 
@@ -39,7 +34,7 @@ def prepare_parser():
     # data settings     
     parser.add_argument('--data', type=str, default='channels'
                        ,help = 'type of data')
-    parser.add_argument('--data_path', type=str, default='../datasets/prop_channels_train/'
+    parser.add_argument('--data_path', type=str, default='datasets/prop_channels_train/'
                        ,help = 'data path')
     parser.add_argument('--labels_path', type=str, default='datasets/prop_labels.csv'
                        ,help = 'labels path')
@@ -244,7 +239,7 @@ def prepare_data(args):
 
     elif args.data == 'channels':
         from datasets import channels_datasets
-        train_data = channels_datasets.Channels(path = args.data_path,labels_path=args.labels_path,ext = arg.data_ext)
+        train_data = channels_datasets.Channels(path = args.data_path,labels_path=args.labels_path,ext = args.data_ext)
 
     else:
         print('no data named :',args.data)

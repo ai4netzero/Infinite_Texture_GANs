@@ -22,7 +22,6 @@ class Res_Discriminator(nn.Module):
         self.att = att
         self.n_classes = n_classes # num_classes
         self.cond_method = cond_method
-        self.patch = patch
          
         
         #method of conditioning
@@ -72,7 +71,7 @@ class Res_Discriminator(nn.Module):
         h = self.activation(h)
 
         h = torch.sum(h,dim = (2,3))
-        h = h.view(-1, self.ch*16)
+        h = h.view(-1, self.base_ch*16)
         output = self.fc(h)
 
         if y is not None and self.cond_method =='proj': # use projection
