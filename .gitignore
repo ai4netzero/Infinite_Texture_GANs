@@ -8,6 +8,9 @@
 # Mac/OSX
 .DS_Store
 
+#datasets
+datasets/
+
 # Windows
 Thumbs.db
 
