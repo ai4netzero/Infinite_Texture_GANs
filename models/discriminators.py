@@ -83,7 +83,7 @@ class Res_Discriminator(nn.Module):
 
 
 class DC_Discriminator(nn.Module): # paper DCGAN 
-    def __init__(self,z_dim=128,img_ch=3,base_ch = 64,n_layers=3):
+    def __init__(self,img_ch=3,base_ch = 64,n_layers=3):
         super(DC_Discriminator, self).__init__()
         self.z_dim = z_dim
 
