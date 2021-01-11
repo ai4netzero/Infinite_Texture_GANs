@@ -52,27 +52,43 @@ def init_weight(m):
 class ConditionalNorm(nn.Module):
     def __init__(self, in_channel, n_condition,SN=False):
         super().__init__()
-        self.n_condition = n_condition
-            
-        self.bn = nn.BatchNorm2d(in_channel, affine=False)  # no learning parameters
-        if SN:
-            self.embed = SpectralNorm(nn.Linear(n_condition, in_channel * 2,bias = True)) # part of w and part of bias
-        else:    
-            self.embed = nn.Linear(n_condition, in_channel * 2,bias = True) # part of w and part of bias
+        self.n_condition = n_condition # number of classes
+        self.fix_scale = fix_scale # whether to fix the scalling param for all conditions or not.
 
-        nn.init.orthogonal_(self.embed.weight.data[:, :in_channel], gain=1)
-        self.embed.weight.data[:, in_channel:].zero_()
+
+        self.bn = nn.BatchNorm2d(in_channel, affine=False)  # no learning parameters
+
+        if fix_scale:
+            out_channels = in_channel
+            self.embed_gamma = torch.nn.Parameter(torch.ones(1,out_channels))
+            nn.init.orthogonal_(self.embed_gamma.data, gain=1)
+        else:
+            out_channels = in_channel*2
+
+        if SN:
+            self.embed = SpectralNorm(nn.Linear(n_condition, out_channels,bias = True)) # part of w and part of bias
+        else:    
+            self.embed = nn.Linear(n_condition, out_channels,bias = True)
+
+        if fix_scale:
+            nn.init.orthogonal_(self.embed.weight.data[:, :in_channel], gain=1)
+            self.embed.weight.data[:, in_channel:].zero_()
+        else:
+            self.embed.weight.data.zero_()
 
     def forward(self, inputs, label):
         out = self.bn(inputs)
         embed = self.embed(label.float())
-        gamma, beta = embed.chunk(2, dim=1)
+        if self.fix_scale:
+            beta = self.embed(label.float())
+            gamma = self.embed_gamma
+        else:
+            gamma, beta = embed.chunk(2, dim=1)
         gamma = gamma.unsqueeze(2).unsqueeze(3)
         beta = beta.unsqueeze(2).unsqueeze(3)
         out = (1+gamma) * out + beta
         return out
-
-    
+ 
 class Attention(nn.Module):
     def __init__(self, channels,SN=False):
         super().__init__()
@@ -99,7 +115,7 @@ class Attention(nn.Module):
     
     
 class ResBlockGenerator(nn.Module):
-    def __init__(self, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0, leak = 0,SN = False):
+    def __init__(self, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0, leak = 0,SN = False,cond_method = 'cbn'):
         super(ResBlockGenerator, self).__init__()
         hidden_channels = out_channels if hidden_channels is None else hidden_channels
         
@@ -115,8 +131,13 @@ class ResBlockGenerator(nn.Module):
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(hidden_channels)
         else:
-            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= SN)
-            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=SN)
+            if cond_method == 'cbn':
+                fix_scale = False
+            elif cond_method == 'cbn_fix_scale':
+                fix_scale = True
+                
+            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= SN,fix_scale=fix_scale)
+            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=SN,fix_scale=fix_scale)
 
         if leak >0:
             self.activation = nn.LeakyReLU(leak)
