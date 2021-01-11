@@ -11,6 +11,12 @@
 #datasets
 datasets/
 
+#results
+*.png
+*.pdf
+*.npy
+
+
 # Windows
 Thumbs.db
 
