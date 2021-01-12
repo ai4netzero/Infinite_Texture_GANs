@@ -50,7 +50,7 @@ def init_weight(m):
         
         
 class ConditionalNorm(nn.Module):
-    def __init__(self, in_channel, n_condition,SN=False):
+    def __init__(self, in_channel, n_condition,SN=False,fix_scale=False):
         super().__init__()
         self.n_condition = n_condition # number of classes
         self.fix_scale = fix_scale # whether to fix the scalling param for all conditions or not.
@@ -135,6 +135,8 @@ class ResBlockGenerator(nn.Module):
                 fix_scale = False
             elif cond_method == 'cbn_fix_scale':
                 fix_scale = True
+            else:
+                raise Exception("Sorry, cond_method named "+cond_method)
                 
             self.bn1 = ConditionalNorm(in_channels,n_classes,SN= SN,fix_scale=fix_scale)
             self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=SN,fix_scale=fix_scale)
