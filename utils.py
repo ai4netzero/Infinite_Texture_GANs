@@ -352,7 +352,7 @@ def sample_pseudo_labels(args,num_classes,batch_size,device):
         y =  torch.randint(low=int(args.min_label), high=int(max_value), size=(batch_size,1)).to(device)
         return y,y
     elif args.ohe:
-        y =  torch.randint(low=int(args.min_label), high=int(max_value), size=(batch_size,1)).to(device)
+        y =  torch.randint(low=int(args.min_label), high=int(max_value), size=(batch_size,)).to(device)
         y_ohe = torch.eye(num_classes)[y].to(device)
         return y_ohe,y_ohe
 
