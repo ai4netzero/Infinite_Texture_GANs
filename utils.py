@@ -36,7 +36,7 @@ def prepare_parser():
                        ,help = 'type of data')
     parser.add_argument('--data_path', type=str, default='datasets/prop_channels_train/'
                        ,help = 'data path')
-    parser.add_argument('--labels_path', type=str, default='datasets/prop_labels.csv'
+    parser.add_argument('--labels_path', type=str, default=None
                        ,help = 'labels path')
     parser.add_argument('--data_ext', type=str, default='txt'
                        ,help = 'data extension txt, png')
