@@ -36,10 +36,11 @@ def prepare_parser():
                        ,help = 'type of data')
     parser.add_argument('--data_path', type=str, default='datasets/prop_channels_train/'
                        ,help = 'data path')
-    parser.add_argument('--labels_path', type=str, default=None
+    parser.add_argument('--labels_path', type=str, default= None
                        ,help = 'labels path')
     parser.add_argument('--data_ext', type=str, default='txt'
                        ,help = 'data extension txt, png')
+                        
     parser.add_argument('--remove_splay', default=False,action='store_true'
                        ,help = 'remove splays from rgb channels')
     parser.add_argument('--sampling', type=int, default=None
