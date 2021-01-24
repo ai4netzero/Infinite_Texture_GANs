@@ -40,7 +40,10 @@ def prepare_parser():
                        ,help = 'labels path')
     parser.add_argument('--data_ext', type=str, default='txt'
                        ,help = 'data extension txt, png')
-
+    parser.add_argument('--remove_splay', default=False,action='store_true'
+                       ,help = 'remove splays from rgb channels')
+    parser.add_argument('--sampling', type=int, default=None
+                       ,help = 'randomly sample --sampling instances from the training data if not None')
     # models settings
     parser.add_argument('--G_model', type=str, default='residual_GAN'
                         ,help = 'Generator Model can be residual_GAN, dcgan, ...')
@@ -239,7 +242,11 @@ def prepare_data(args):
 
     elif args.data == 'channels':
         from datasets import channels_datasets
-        train_data = channels_datasets.Channels(path = args.data_path,labels_path=args.labels_path,ext = args.data_ext)
+        train_data = channels_datasets.Channels(path = args.data_path
+                                                ,labels_path=args.labels_path
+                                                ,ext = args.data_ext
+                                                ,remove_splay = args.remove_splay
+                                                ,sampling = args.sampling)
 
     else:
         print('no data named :',args.data)
@@ -485,3 +492,12 @@ def calc_ralsloss_G(real, fake, margin=1.0):
     loss = (loss_real + loss_fake)
     
     return loss
+
+def replace_face(img,old_face,new_face):
+    new_img = img.copy()
+    for x in range(np.size(new_img,0)):
+        for y in range(np.size(new_img,1)):
+            if sum(new_img[x,y,:] == old_face)==3 :
+                new_img[x,y,:] =  new_face
+    return new_img
+                
