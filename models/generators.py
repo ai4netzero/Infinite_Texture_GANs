@@ -31,7 +31,7 @@ class Res_Generator(nn.Module):
         self.block2 = ResBlockGenerator(base_ch*8, base_ch*4,upsample=True,n_classes = n_classes,leak = leak,SN=SN,cond_method=cond_method)
         self.block3 = ResBlockGenerator(base_ch*4, base_ch*2,upsample=True,n_classes = n_classes,leak = leak,SN=SN,cond_method=cond_method)
         if att:
-            self.attention = Attention(base_ch*2,SN=True)
+            self.attention = Attention(base_ch*2,SN=SN)
         self.block4 = ResBlockGenerator(base_ch*2, base_ch,upsample=True,n_classes = n_classes,leak = leak,SN=SN,cond_method=cond_method)
         
         self.bn = nn.BatchNorm2d(base_ch)
