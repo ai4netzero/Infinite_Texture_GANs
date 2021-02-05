@@ -78,11 +78,11 @@ class ConditionalNorm(nn.Module):
 
     def forward(self, inputs, label):
         out = self.bn(inputs)
-        embed = self.embed(label.float())
         if self.fix_scale:
             beta = self.embed(label.float())
             gamma = self.embed_gamma
         else:
+            embed = self.embed(label.float())
             gamma, beta = embed.chunk(2, dim=1)
         gamma = gamma.unsqueeze(2).unsqueeze(3)
         beta = beta.unsqueeze(2).unsqueeze(3)
