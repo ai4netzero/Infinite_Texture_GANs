@@ -71,10 +71,10 @@ class ConditionalNorm(nn.Module):
             self.embed = nn.Linear(n_condition, out_channels,bias = True)
 
         if fix_scale:
+            self.embed.weight.data.zero_()
+        else:
             nn.init.orthogonal_(self.embed.weight.data[:, :in_channel], gain=1)
             self.embed.weight.data[:, in_channel:].zero_()
-        else:
-            self.embed.weight.data.zero_()
 
     def forward(self, inputs, label):
         out = self.bn(inputs)
