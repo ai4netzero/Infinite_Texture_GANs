@@ -365,7 +365,7 @@ def sample_pseudo_labels(args,num_classes,batch_size,device):
         return y_ohe,y_ohe
 
     else: # continious conditions
-        y = (args.max_label - args.min_label) * torch.rand(batch_size,1) + args.min_label
+        y = (args.max_label - args.min_label) * torch.rand(batch_size,num_classes) + args.min_label
         y = y.to(device)
         return y,y
 
@@ -393,7 +393,7 @@ def sample_from_gen(args,b_size, zdim, num_classes,netG,device ='cpu',truncated 
     if num_classes>0:
         y_D,y_G = sample_pseudo_labels(args,num_classes,b_size,device)
     else:
-        y_D,y_G = None,None   
+        y_D,y_G = None,None
     fake = netG(z, y_G)
     
     return fake, y_D
