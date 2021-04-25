@@ -150,6 +150,10 @@ def prepare_parser():
                        ,help = 'use one hot encoding for conditioning')
     parser.add_argument('--SN_y', action='store_true' , default=False
                         ,help='apply SN to the condition linear layer')
+    parser.add_argument('--y_real_GD', action='store_true' , default=False
+                        ,help='Use same real conditions for both G and D')
+    parser.add_argument('--x_fake_GD', action='store_true' , default=False
+                        ,help='Use same fake data for both G and D')
     return parser
 
 
@@ -380,7 +384,8 @@ def disc_2_cont(y,c_list,device): # convert discrete label to label in c_list
     return y    
     
 #generate fake images
-def sample_from_gen(args,b_size, zdim, num_classes,netG,device ='cpu',truncated = 0): 
+def sample_from_gen(args,b_size, zdim, num_classes,netG,device ='cpu',truncated = 0,real_y = None): 
+
     # latent z
     if args.z_dist == 'normal': 
         z = torch.randn(b_size, zdim).to(device=device)
@@ -389,11 +394,17 @@ def sample_from_gen(args,b_size, zdim, num_classes,netG,device ='cpu',truncated 
         
     if truncated > 0:
         z = get_trun_noise(truncated,zdim,b_size,device)
+
     #labels
     if num_classes>0:
-        y_D,y_G = sample_pseudo_labels(args,num_classes,b_size,device)
+        if args.y_real_GD:
+            y_D = real_y
+            y_G = real_y
+        else:
+            y_D,y_G = sample_pseudo_labels(args,num_classes,b_size,device)
     else:
         y_D,y_G = None,None
+
     fake = netG(z, y_G)
     
     return fake, y_D

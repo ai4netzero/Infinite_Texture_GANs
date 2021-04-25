@@ -185,7 +185,7 @@ def train(num_epochs=1, disc_iters=1):
                 D_loss_real.backward()
 
                 # update with fake labels
-                fake_x, fake_y = sample_from_gen(args,G_b_size,zdim,n_cl,netG,device)
+                fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
                 fake_logit = netD(fake_x.detach(),fake_y)
                     
                 if loss_fun == 'hinge':  
@@ -203,7 +203,8 @@ def train(num_epochs=1, disc_iters=1):
                 
            # Update G
             netG.zero_grad()
-            fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device)
+            if args.x_fake_GD is False:
+                fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
             fake_logit = netD(fake_x,fake_y)
 
             if loss_fun == 'hinge':
