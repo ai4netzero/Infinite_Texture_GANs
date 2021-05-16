@@ -50,27 +50,26 @@ def init_weight(m):
         
         
 class ConditionalNorm(nn.Module):
-    def __init__(self, in_channel, n_condition,SN=False,fix_scale=False):
+    def __init__(self, in_channel, n_condition,SN=False,cond_method='cbn'):
         super().__init__()
         self.n_condition = n_condition # number of classes
-        self.fix_scale = fix_scale # whether to fix the scalling param for all conditions or not.
+        self.cond_method = cond_method
+        self.in_channel = in_channel
+        #self.fix_scale = fix_scale # whether to fix the scalling param for all conditions or not.
 
 
         self.bn = nn.BatchNorm2d(in_channel, affine=False)  # no learning parameters
 
-        if fix_scale:
+        if self.cond_method == 'cbn_fix_scale':
             out_channels = in_channel
             self.embed_gamma = torch.nn.Parameter(torch.ones(1,out_channels))
             nn.init.orthogonal_(self.embed_gamma.data, gain=1)
         else:
             out_channels = in_channel*2
+  
+        self.embed = Linear(n_condition, out_channels,bias = True,SN=SN)
 
-        if SN:
-            self.embed = SpectralNorm(nn.Linear(n_condition, out_channels,bias = True)) # part of w and part of bias
-        else:    
-            self.embed = nn.Linear(n_condition, out_channels,bias = True)
-
-        if fix_scale:
+        if self.cond_method == 'cbn_fix_scale':
             self.embed.weight.data.zero_()
         else:
             nn.init.orthogonal_(self.embed.weight.data[:, :in_channel], gain=1)
@@ -78,14 +77,24 @@ class ConditionalNorm(nn.Module):
 
     def forward(self, inputs, label):
         out = self.bn(inputs)
-        if self.fix_scale:
+        if self.cond_method == 'cbn_fix_scale':
             beta = self.embed(label.float())
             gamma = self.embed_gamma
+            gamma = gamma.unsqueeze(2).unsqueeze(3)
+            beta = beta.unsqueeze(2).unsqueeze(3)
+        elif self.cond_method == 'spade_1x4':
+            label = torch.diag_embed(label)
+            embed = self.embed(label.float())
+            gamma, beta = embed.chunk(2, dim=-1)
+            gamma =gamma.reshape(-1,self.in_channel,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,self.in_channel,inputs.size(2),inputs.size(2))
+            gamma = torch.transpose(gamma, 2, 3)
+            beta=beta.reshape(-1,self.in_channel,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,self.in_channel,inputs.size(2),inputs.size(2))
+            beta = torch.transpose(beta, 2, 3)
         else:
             embed = self.embed(label.float())
             gamma, beta = embed.chunk(2, dim=1)
-        gamma = gamma.unsqueeze(2).unsqueeze(3)
-        beta = beta.unsqueeze(2).unsqueeze(3)
+            gamma = gamma.unsqueeze(2).unsqueeze(3)
+            beta = beta.unsqueeze(2).unsqueeze(3)
         out = (1+gamma) * out + beta
         return out
  
@@ -130,16 +139,9 @@ class ResBlockGenerator(nn.Module):
         if n_classes == 0:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(hidden_channels)
-        else:
-            if cond_method == 'cbn':
-                fix_scale = False
-            elif cond_method == 'cbn_fix_scale':
-                fix_scale = True
-            else:
-                raise Exception("Sorry, cond_method named "+cond_method)
-                
-            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= SN,fix_scale=fix_scale)
-            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=SN,fix_scale=fix_scale)
+        else:                
+            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= SN,cond_method=cond_method)
+            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=SN,cond_method=cond_method)
 
         if leak >0:
             self.activation = nn.LeakyReLU(leak)
