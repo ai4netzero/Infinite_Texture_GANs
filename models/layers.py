@@ -89,8 +89,8 @@ class ConditionalNorm(nn.Module):
             label = label.view(-1,1,1,y.size(-1))
             embed = self.embed(label.float())
             gamma, beta = embed.chunk(2, dim=-1)
-            gamma = torch.transpose(gamma.reshape(-1,ch_in,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,ch_in,inputs.size(2),inputs.size(2)), 2, 3)
-            beta = torch.transpose(beta.reshape(-1,ch_in,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,ch_in,inputs.size(2),inputs.size(2)), 2, 3)
+            gamma = torch.transpose(gamma.reshape(-1,self.in_channel,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,self.in_channel,inputs.size(2),inputs.size(2)), 2, 3)
+            beta = torch.transpose(beta.reshape(-1,self.in_channel,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,self.in_channel,inputs.size(2),inputs.size(2)), 2, 3)
         else:
             embed = self.embed(label.float())
             gamma, beta = embed.chunk(2, dim=1)
