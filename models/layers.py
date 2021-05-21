@@ -66,8 +66,11 @@ class ConditionalNorm(nn.Module):
             nn.init.orthogonal_(self.embed_gamma.data, gain=1)
         else:
             out_channels = in_channel*2
-  
-        self.embed = Linear(n_condition, out_channels,bias = True,SN=SN)
+            
+        if self.cond_method == 'spade_1x4':
+            self.embed = conv1x1(1, out_channels,bias = True,SN=SN)
+        else:
+            self.embed = Linear(n_condition, out_channels,bias = True,SN=SN)
 
         if self.cond_method == 'cbn_fix_scale':
             self.embed.weight.data.zero_()
@@ -83,13 +86,11 @@ class ConditionalNorm(nn.Module):
             gamma = gamma.unsqueeze(2).unsqueeze(3)
             beta = beta.unsqueeze(2).unsqueeze(3)
         elif self.cond_method == 'spade_1x4':
-            label = torch.diag_embed(label)
+            label = label.view(-1,1,1,y.size(-1))
             embed = self.embed(label.float())
             gamma, beta = embed.chunk(2, dim=-1)
-            gamma =gamma.reshape(-1,self.in_channel,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,self.in_channel,inputs.size(2),inputs.size(2))
-            gamma = torch.transpose(gamma, 2, 3)
-            beta=beta.reshape(-1,self.in_channel,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,self.in_channel,inputs.size(2),inputs.size(2))
-            beta = torch.transpose(beta, 2, 3)
+            gamma = torch.transpose(gamma.reshape(-1,ch_in,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,ch_in,inputs.size(2),inputs.size(2)), 2, 3)
+            beta = torch.transpose(beta.reshape(-1,ch_in,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,ch_in,inputs.size(2),inputs.size(2)), 2, 3)
         else:
             embed = self.embed(label.float())
             gamma, beta = embed.chunk(2, dim=1)
