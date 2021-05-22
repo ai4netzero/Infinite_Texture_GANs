@@ -86,7 +86,7 @@ class ConditionalNorm(nn.Module):
             gamma = gamma.unsqueeze(2).unsqueeze(3)
             beta = beta.unsqueeze(2).unsqueeze(3)
         elif self.cond_method == 'spade_1x4':
-            label = label.view(-1,1,1,y.size(-1))
+            label = label.view(-1,1,1,label.size(-1))
             embed = self.embed(label.float())
             gamma, beta = embed.chunk(2, dim=-1)
             gamma = torch.transpose(gamma.reshape(-1,self.in_channel,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,self.in_channel,inputs.size(2),inputs.size(2)), 2, 3)
