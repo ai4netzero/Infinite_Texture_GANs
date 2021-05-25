@@ -67,7 +67,7 @@ class ConditionalNorm(nn.Module):
         else:
             out_channels = in_channel*2
             
-        if self.cond_method == 'spade_1x4':
+        if self.cond_method == 'cond_conv1x1':
             self.embed = conv1x1(1, out_channels,bias = True,SN=SN)
         else:
             self.embed = Linear(n_condition, out_channels,bias = True,SN=SN)
@@ -85,10 +85,10 @@ class ConditionalNorm(nn.Module):
             gamma = self.embed_gamma
             gamma = gamma.unsqueeze(2).unsqueeze(3)
             beta = beta.unsqueeze(2).unsqueeze(3)
-        elif self.cond_method == 'spade_1x4':
+        elif self.cond_method == 'cond_conv1x1':
             label = label.view(-1,1,1,label.size(-1))
             embed = self.embed(label.float())
-            gamma, beta = embed.chunk(2, dim=-1)
+            gamma, beta = embed.chunk(2, dim=1)
             gamma = torch.transpose(gamma.reshape(-1,self.in_channel,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,self.in_channel,inputs.size(2),inputs.size(2)), 2, 3)
             beta = torch.transpose(beta.reshape(-1,self.in_channel,1,4).repeat_interleave((inputs.size(2)**2)//4,-1).view(-1,self.in_channel,inputs.size(2),inputs.size(2)), 2, 3)
         else:
