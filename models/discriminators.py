@@ -36,13 +36,16 @@ class Res_Discriminator(nn.Module):
                 self.embed_y = Linear(n_classes,base_ch * 16,SN=SN_y)
                 #self.embed_y = nn.Embedding(n_classes,ch * 16).apply(init_weight)
             
+            elif self.cond_method =='cond_conv1x1':
+                self.embed_y = conv1x1(1,base_ch * 2*8*2,SN=SN_y)
+            
             
         self.block1=OptimizedBlock(img_ch, base_ch,leak = leak,SN=SN)  #x/2
         if att:
             self.attention = Attention(base_ch,SN=SN)
         self.block2=ResBlockDiscriminator(base_ch, base_ch*2, downsample=True,leak = leak,SN=SN) #x/2
         
-        if n_classes > 0 and self.cond_method =='concat':
+        if n_classes > 0 and (self.cond_method =='concat' or self.cond_method =='cond_conv1x1'):
             self.block3=ResBlockDiscriminator(base_ch*2 , base_ch*2,downsample=True,leak = leak,SN=SN)  #x/2
         else:    
             self.block3=ResBlockDiscriminator(base_ch*2 , base_ch*4,downsample=True,leak = leak,SN=SN)  #x/2
@@ -65,6 +68,15 @@ class Res_Discriminator(nn.Module):
             h_y = self.embed_y(y)
             h_y = h_y.view(-1,self.base_ch*2,8,8)
             h = torch.cat((h,h_y),1)
+        elif y is not None and self.cond_method =='cond_conv1x1':
+            y = y.view(-1,1,1,y.size(-1))
+            h_y = self.embed_y(y)
+            h_y_ = h_y[:,:,:,0].view(-1,self.base_ch*2,8,2)
+            for i in range(1,h_y.size(3)):
+                h_y_i = h_y[:,:,:,i].view(-1,self.base_ch*2,8,2)
+                h_y_ = torch.cat((h_y_,h_y_i),3)
+            #h_y = h_y.view(-1,self.base_ch*2,8,8)
+            h = torch.cat((h,h_y_),1)
         #print(h.shape)    
         h = self.block4(h)
         h = self.block5(h)
