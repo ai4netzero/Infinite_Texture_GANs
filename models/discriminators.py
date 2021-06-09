@@ -36,9 +36,9 @@ class Res_Discriminator(nn.Module):
                 self.embed_y = Linear(n_classes,base_ch * 16,SN=SN_y)
                 #self.embed_y = nn.Embedding(n_classes,ch * 16).apply(init_weight)
             
-            elif self.cond_method =='cond_conv1x1':
+            elif self.cond_method =='conv1x1':
                 self.embed_y = conv1x1(1,base_ch * 4,SN=SN_y)
-            elif self.cond_method =='cond_conv3x3':
+            elif self.cond_method =='conv3x3':
                 self.embed_y = conv3x3(1,base_ch * 4,SN=SN_y)
                         
             
@@ -89,11 +89,11 @@ class Res_Discriminator(nn.Module):
             h = torch.cat((h,h_y),1)
         #print(h.shape)    
         h = self.block4(h)
-        if y is not None and self.cond_method =='cond_conv1x1':
+        if y is not None and 'conv' in self.cond_method:
             w = h.size(-1)
             y = y.view(-1,1,w,w)
             h_y = self.embed_y(y)
-            h = torch.cat((h,h_y_),1)
+            h = torch.cat((h,h_y),1)
         '''elif y is not None and self.cond_method =='cond_conv3x3':
             w = h.size(2)
             y = y.view(-1,1,w,w)
