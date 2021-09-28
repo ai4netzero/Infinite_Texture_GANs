@@ -68,8 +68,16 @@ class ConditionalNorm(nn.Module):
             out_channels = in_channel*2
             
         if self.cond_method == 'conv1x1':
+            self.mlp_shared = nn.Sequential(
+            conv1x1(1, 128,bias = True,SN=SN),
+            nn.ReLU()
+            )
             self.embed = conv1x1(1, out_channels,bias = True,SN=SN)
         elif self.cond_method == 'conv3x3':
+            self.mlp_shared = nn.Sequential(
+            conv3x3(1, 128,bias = True,SN=SN),
+            nn.ReLU()
+            )
             self.embed = conv3x3(1, out_channels,bias = True,SN=SN)
         else:
             self.embed = Linear(n_condition, out_channels,bias = True,SN=SN)
