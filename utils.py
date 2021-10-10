@@ -41,8 +41,6 @@ def prepare_parser():
     parser.add_argument('--data_ext', type=str, default='txt'
                        ,help = 'data extension txt, png')
                         
-    parser.add_argument('--remove_splay', default=False,action='store_true'
-                       ,help = 'remove splays from rgb channels')
     parser.add_argument('--sampling', type=int, default=None
                        ,help = 'randomly sample --sampling instances from the training data if not None')
     # models settings
@@ -250,7 +248,6 @@ def prepare_data(args):
         train_data = channels_datasets.Channels(path = args.data_path
                                                 ,labels_path=args.labels_path
                                                 ,ext = args.data_ext
-                                                ,remove_splay = args.remove_splay
                                                 ,sampling = args.sampling)
 
     else:
