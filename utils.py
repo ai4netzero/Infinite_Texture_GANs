@@ -244,8 +244,8 @@ def prepare_data(args):
                                    ]))
 
     elif args.data == 'channels':
-        from datasets import channels_datasets
-        train_data = channels_datasets.Channels(path = args.data_path
+        from datasets import channel_datasets
+        train_data = channel_datasets.Channels(path = args.data_path
                                                 ,labels_path=args.labels_path
                                                 ,ext = args.data_ext
                                                 ,sampling = args.sampling)
