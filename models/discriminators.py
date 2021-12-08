@@ -93,7 +93,6 @@ class Res_Discriminator(nn.Module):
 class DC_Discriminator(nn.Module): # paper DCGAN 
     def __init__(self,img_ch=3,base_ch = 64,n_layers=3):
         super(DC_Discriminator, self).__init__()
-        self.z_dim = z_dim
 
         sequence = [ conv4x4(img_ch, base_ch, bias=False),
         nn.LeakyReLU(0.2, inplace=True)]
@@ -120,7 +119,7 @@ class DC_Discriminator(nn.Module): # paper DCGAN
 
 class SN_Discriminator(nn.Module): # paper SNGAN
     def __init__(self,img_ch=3,base_ch = 64,spectral_norm = False,leak =0.1):
-        super(CNN_Discriminator, self).__init__()
+        super(SN_Discriminator, self).__init__()
         self.leak = leak
         self.base_ch = base_ch
         self.conv1 = conv3x3(img_ch, base_ch,SN=spectral_norm)
