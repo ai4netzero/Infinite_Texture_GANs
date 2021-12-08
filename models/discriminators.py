@@ -47,7 +47,10 @@ class Res_Discriminator(nn.Module):
             self.attention = Attention(base_ch,SN=SN)
         self.block2=ResBlockDiscriminator(base_ch, base_ch*2, downsample=True,leak = leak,SN=SN) #x/2
         
-        self.block3=ResBlockDiscriminator(base_ch*2 , base_ch*4,downsample=True,leak = leak,SN=SN)  #x/2
+        if n_classes > 0 and self.cond_method =='concat':
+            self.block3=ResBlockDiscriminator(base_ch*2 , base_ch*2,downsample=True,leak = leak,SN=SN)  #x/2
+        else:
+            self.block3=ResBlockDiscriminator(base_ch*2 , base_ch*4,downsample=True,leak = leak,SN=SN)  #x/2
 
         if n_classes > 0 and self.cond_method !='proj':
             self.block4=ResBlockDiscriminator(base_ch*4, base_ch*4,downsample=True,leak = leak,SN=SN)  #x/2
