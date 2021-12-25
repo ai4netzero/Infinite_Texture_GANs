@@ -64,7 +64,7 @@ def prepare_parser():
                         ,help = 'use leaky relu activation for discriminator with leak= leak_G,zero value will use RELU')
     parser.add_argument('--zdim', type=int, default=128
                         ,help ='dimenstion of latent vector')
-    parser.add_argument('--spec_norm_D', default=True,action='store_false'
+    parser.add_argument('--spec_norm_D', default=False,action='store_true'
                        ,help = 'apply spectral normalization in discriminator')
     parser.add_argument('--spec_norm_G', default=False,action='store_true'
                        ,help = 'apply spectral normalization in generator')
@@ -90,8 +90,6 @@ def prepare_parser():
     #training settings
     parser.add_argument('--loss', type=str, default='standard'
                         ,help = 'Loss function can be standard,hinge or wgan')
-    parser.add_argument('--separate_loss', default=False,action='store_true'
-                        ,help = 'apply loss function seprately on D outpouts')
     parser.add_argument('--disc_iters', type=int, default=1
                         ,help = ' no. discriminator updates per one generator update')
     parser.add_argument('--epochs', type=int, default=1
@@ -112,11 +110,9 @@ def prepare_parser():
                        ,help = 'None to use random seed can be fixed for reporoduction')
     parser.add_argument('--z_dist', type=str, default='normal'
                        , help = ' distribution of latent space normal/uniform')
-    parser.add_argument('--smooth',default=True,action='store_false'
+    parser.add_argument('--smooth',default=False,action='store_true'
                        , help = 'Use smooth labeling if True')
      
-    parser.add_argument('--print_acc_t',action='store_true' , default=False
-                       , help = 'print the area of conn. comp. in the channels')
 
     # GPU settings
     parser.add_argument('--ngpu', type=int, default=1
@@ -152,33 +148,6 @@ def prepare_parser():
                         ,help='Use same real conditions for both G and D')
     parser.add_argument('--x_fake_GD', action='store_true' , default=False
                         ,help='Use same fake data for both G and D')
-    return parser
-
-
-# these arguments apply only when running sample.py file to generate images.                        
-def add_sample_parser(parser):
-                        
-    # paths                    
-    parser.add_argument('--G_cp', type=str, default=None
-                        ,help='path of generator checkpoint .pth file ')
-    parser.add_argument('--out_path', type=str, default='out'
-                       ,help = 'path to save images')
-    parser.add_argument('--many', type=str, default=None
-                        ,help='dir of the folder that contains .pth files to generate from multiple checkpoints')                 
-    parser.add_argument('--truncated', type=float, default=0
-                        ,help = 'if greater than 0 it will apply a truncation to normal dist. with --truncated value')
-    parser.add_argument('--num_imgs', type=int, default=1000
-                       , help = 'number of images to be generated')
-    parser.add_argument('--img_name', type=str, default=''
-                       ,help = 'append a string to the generate images numbers')
-                                          
-    # Genertared images configuration                    
-    parser.add_argument('--figure', type=str, default='grid'
-                        ,help='grid to save a grid of generated images or images to save them in --out_path')
-    parser.add_argument('--grid_rows', type=int, default=3
-                        ,help='num of rows in the grid')
-    parser.add_argument('--gray2rgb', default=True,action='store_false'
-                        ,help='If True save single-channel images as 3 channels')
     return parser
 
 
@@ -236,7 +205,7 @@ def prepare_data(args):
 
     elif  args.data == 'cifar':
         train_data = dset.CIFAR10(root='./data', train=True, download=True,
-                                   transform=stransforms.Compose([
+                                   transform=transforms.Compose([
                                        # transforms.Resize(image_size),
                                        # transforms.CenterCrop(image_size),
                                        transforms.ToTensor(),
@@ -267,7 +236,7 @@ def prepare_models(args,n_cl = 0,device = 'cpu',only_G = False):
     #model
     if args.G_model == 'dcgan':
         netG = generators.DC_Generator(args.zdim,img_ch=args.img_ch,base_ch= args.G_ch).to(device)
-        netG.apply(weihts_init)
+        netG.apply(init_weight)
 
     elif args.G_model == 'residual_GAN':
         netG = generators.Res_Generator(args.zdim,img_ch=args.img_ch,n_classes = n_cl
@@ -283,14 +252,14 @@ def prepare_models(args,n_cl = 0,device = 'cpu',only_G = False):
                                              ,base_ch= args.D_ch
                                              ,leak = args.leak_D
                                              ,n_layers = args.n_layers_D).to(device)  
-        netD.apply(weights_init)
+        netD.apply(init_weight)
 
     elif args.D_model == 'cnn_sngan':
         netD = discriminators.SN_Discriminator(img_ch=args.img_ch
                                             ,base_ch= args.D_ch
                                             ,leak = args.leak_D
                                             ,SN=args.spec_norm_D).to(device)  
-        netD.apply(weights_init)                            
+        netD.apply(init_weight)                            
 
     elif args.D_model == 'residual_GAN':
         netD = discriminators.Res_Discriminator(img_ch=args.img_ch,n_classes = n_cl,base_ch = args.D_ch
@@ -429,43 +398,6 @@ def get_trun_noise(truncated,z_dim,b_size,device):
     z = torch.from_numpy(z[:b_size*z_dim]).view(b_size,z_dim)
     z = z.float().to(device)
     return z
-
-def save_images(args,netG,device,out_path):
-    n_images= args.num_imgs
-    truncated=args.truncated
-
-    if not os.path.exists(out_path):
-        os.mkdir(out_path)
-        
-    im_batch_size = 50
-    
-    if n_images<im_batch_size:
-        im_batch_size = n_images
-        
-    n_batches = n_images//im_batch_size
-        
-    for i_batch in range(0, n_images, im_batch_size):
-        if i_batch ==  n_batches*im_batch_size:
-            im_batch_size = n_images - i_batch
-            
-        gen_images,_ = sample_from_gen(args,im_batch_size,args.zdim,args.n_cl,netG,device,truncated = args.truncated)
-        gen_images = gen_images.cpu().detach()
-        #shape=(*,ch=3,h,w), torch.Tensor
-        
-        #denormalize
-        gen_images = gen_images*0.5 + 0.5
-        
-        if args.gray2rgb:
-            for i_image in range(gen_images.size(0)):
-                save_image(gen_images[i_image, :, :, :],
-                           os.path.join(out_path,args.img_name+ f'image_{i_batch+i_image:05d}.png'))
-        else:
-            for i_image in range(gen_images.size(0)):
-                x_pil = transforms.ToPILImage()(gen_images[i_image, :, :, :])
-                x_pil.save(os.path.join(out_path,args.img_name+ f'image_{i_batch+i_image:05d}.png'))
-
-    #shutil.make_archive(f'images', 'zip', out_path)
-    
 
 def save_grid(args,netG,device,nrows=3,ncol=3,out_path = 'plot'):
     b_size = nrows*ncol
