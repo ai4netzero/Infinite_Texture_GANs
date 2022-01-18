@@ -153,3 +153,53 @@ class SN_Discriminator(nn.Module): # paper SNGAN
         m = nn.LeakyReLU(self.leak)(self.conv7(m))
 
         return self.fc(m.view(-1, 8 * 8  * self.base_ch*8))
+
+
+# paper pix2pix,sinGAN(batchnorm), SPADE,pix2pixHD(instancenorm)
+class Patch_Discriminator(nn.Module):
+    def __init__(self, img_ch=1,base_ch = 64,n_layers_D=4,kw = 4,SN= False,norm_layer = None):
+        super(Patch_Discriminator, self).__init__()   
+        nf = base_ch
+        self.img_ch = img_ch
+        padw = 1
+        if kw == 4:
+            conv_fun =  conv4x4   
+        elif kw==3:
+            conv_fun =  conv3x3  
+
+        if norm_layer == 'batch':
+            norm_layer = nn.BatchNorm2d
+            affine = True
+        elif norm_layer == 'instance':
+            norm_layer = nn.InstanceNorm2d
+            affine = False
+            
+        sequence = [conv_fun(img_ch, base_ch,SN=SN,bias = True),
+                nn.LeakyReLU(0.2, False)]
+
+        for n in range(1, n_layers_D):
+            nf_prev = nf
+            nf = min(nf * 2, 512)
+            stride = 1 if n == n_layers_D - 1 else 2
+            if norm_layer:
+                sequence += [conv_fun(nf_prev, nf,s = stride, SN=SN,bias = True),
+                            norm_layer(nf,affine=affine),
+                            nn.LeakyReLU(0.2, False)
+                            ]
+            else:
+                sequence += [conv_fun(nf_prev, nf,s = stride, SN=SN,bias = True),
+                            nn.LeakyReLU(0.2, False)
+                            ]                
+
+        #sequence += [SpectralNorm(nn.Conv2d(nf, 1, kernel_size=kw, stride=1, padding=padw,bias = True))]
+        sequence += [conv_fun(nf, 1,s = 1, SN=SN,bias = True)]
+
+        self.model = nn.Sequential(*sequence)
+    def forward(self, x,y=None):
+        if y is not None:
+            y = self.embed_y(y).view(-1,self.img_ch,64,64)
+            h= torch.cat((x,y),1)
+        else:
+            h = x    
+        out = self.model(h)
+        return out

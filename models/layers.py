@@ -21,7 +21,7 @@ def conv4x4(ch_in,ch_out,SN = False,s = 2,p=1,bias = True):
     if SN:
         return SpectralNorm(nn.Conv2d(ch_in, ch_out, kernel_size=4, padding=p,stride=s,bias = bias))
     else:
-        return nn.Conv2d(ch_in, ch_out, kernel_size=4, padding=p,stxride=s,bias = bias)    
+        return nn.Conv2d(ch_in, ch_out, kernel_size=4, padding=p,stride=s,bias = bias)    
     
 def conv1x1(ch_in,ch_out,SN = False,s = 1,p=0,bias = True):
     if SN:

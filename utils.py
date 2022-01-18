@@ -36,8 +36,8 @@ def prepare_parser():
                        ,help = 'type of data')
     parser.add_argument('--data_path', type=str, default='datasets/prop_channels_train/'
                        ,help = 'data path')
-    parser.add_argument('--labels_path', type=str, default= None
-                       ,help = 'labels path')
+    parser.add_argument('--csv_path', type=str, default= None
+                       ,help = 'csv path')
     parser.add_argument('--data_ext', type=str, default='txt'
                        ,help = 'data extension txt, png')
                         
@@ -69,9 +69,10 @@ def prepare_parser():
     parser.add_argument('--spec_norm_G', default=False,action='store_true'
                        ,help = 'apply spectral normalization in generator')
     parser.add_argument('--n_layers_D', type=int, default=3
-                       ,help = 'number of layers used in discriminator of dcgan')
+                       ,help = 'number of layers used in discriminator of dcgan,patchGAN')
+    parser.add_argument('--norm_layer_D', type=str, default=None
+                       ,help = 'normalization layer in patchGAN')
 
-    # Double discriminators parameters
 
     # optimizers settings
     parser.add_argument('--lr_G', type=float, default=2e-4
@@ -215,7 +216,7 @@ def prepare_data(args):
     elif args.data == 'channels':
         from datasets import channel_datasets
         train_data = channel_datasets.Channels(path = args.data_path
-                                                ,labels_path=args.labels_path
+                                                ,csv_path = args.csv_path
                                                 ,ext = args.data_ext
                                                 ,sampling = args.sampling)
 
@@ -232,7 +233,7 @@ def prepare_data(args):
 
 
             
-def prepare_models(args,n_cl = 0,device = 'cpu',only_G = False):           
+def prepare_models(args,n_cl = 0,device = 'cpu'):           
     #model
     if args.G_model == 'dcgan':
         netG = generators.DC_Generator(args.zdim,img_ch=args.img_ch,base_ch= args.G_ch).to(device)
@@ -243,9 +244,6 @@ def prepare_models(args,n_cl = 0,device = 'cpu',only_G = False):
                                         ,base_ch = args.G_ch,leak = args.leak_G,att = args.att
                                         ,SN = args.spec_norm_G
                                         ,cond_method = args.G_cond_method).to(device)
-
-    if only_G:
-        return netG
 
     if args.D_model == 'dcgan':
         netD = discriminators.DC_Discriminator(img_ch=args.img_ch
@@ -266,8 +264,11 @@ def prepare_models(args,n_cl = 0,device = 'cpu',only_G = False):
                                     ,leak = args.leak_D,att = args.att
                                     ,cond_method = args.D_cond_method
                                     ,SN = args.spec_norm_D
-                                    ,SN_y = args.SN_y).to(device)                                            
+                                    ,SN_y = args.SN_y).to(device)
 
+    elif args.D_model == 'patch_GAN':
+        netD = discriminators.Patch_Discriminator(img_ch=args.img_ch,base_ch = 64,n_layers_D=args.n_layers_D,kw = 4
+                                    ,SN= args.spec_norm_D,norm_layer = args.norm_layer_D).to(device)
     return netG,netD
 
 def load_from_saved(args,netG,netD,optimizerG,optimizerD):
