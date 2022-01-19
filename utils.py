@@ -113,7 +113,14 @@ def prepare_parser():
                        , help = ' distribution of latent space normal/uniform')
     parser.add_argument('--smooth',default=False,action='store_true'
                        , help = 'Use smooth labeling if True')
-     
+    parser.add_argument('--x_fake_GD', action='store_true' , default=False
+                        ,help='Use same fake data for both G and D')
+    parser.add_argument('--G_patch_1D',default=False,action='store_true'
+                       , help = 'Generate patches in 1D')
+    parser.add_argument('--zdim_b', type=int, default=4
+                        ,help ='dimension of border z')
+    parser.add_argument('--num_patches_per_img', type=int, default=2
+                        ,help ='num_patches_per_img')
 
     # GPU settings
     parser.add_argument('--ngpu', type=int, default=1
@@ -147,8 +154,7 @@ def prepare_parser():
                         ,help='apply SN to the condition linear layer')
     parser.add_argument('--y_real_GD', action='store_true' , default=False
                         ,help='Use same real conditions for both G and D')
-    parser.add_argument('--x_fake_GD', action='store_true' , default=False
-                        ,help='Use same fake data for both G and D')
+
     return parser
 
 
@@ -375,6 +381,51 @@ def sample_from_gen(args,b_size, zdim, num_classes,netG,device ='cpu',truncated 
     fake = netG(z, y_G)
     
     return fake, y_D
+
+#generate fake patches
+def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num_classes,netG,device ='cpu',real_y = None): 
+
+    # latent z
+    if args.z_dist == 'normal': 
+        z = torch.randn(b_size, zdim).to(device=device)
+    elif args.z_dist =='uniform':
+        z =2*torch.rand(b_size, zdim).to(device=device) -1
+
+        
+    #border z
+    z_b = torch.randn(b_size, zdim_b,zdim_b).to(device=device)
+    
+    for k in range(b_size//num_patches_per_img): # for each image
+        for p in range(1,num_patches_per_img):
+            z_b[k*num_patches_per_img+p,:,0] = z_b[k*num_patches_per_img+p-1,:,-1]
+    
+    #labels
+    #if num_classes>0:
+    #    if args.y_real_GD:
+    #        y_D = real_y
+    #        y_G = real_y
+    #    else:
+    #        y_D,y_G = sample_pseudo_labels(args,num_classes,b_size,device)
+    #else:
+    #    y_D,y_G = None,None
+
+    y_G = z_b
+    y_D = None
+    fake = netG(z, y_G)
+    
+    return fake, y_D
+
+def merge_patches_1D(patches,num_patches_per_img,device):
+    b_size = patches.size(0)
+    imgs = torch.empty(b_size//num_patches_per_img,patches.size(1),patches.size(2),patches.size(3)*num_patches_per_img)
+    for k in range(b_size//num_patches_per_img): # for each image
+        img = patches[k*num_patches_per_img]
+        for p in range(1,num_patches_per_img):
+            img = torch.cat((img,patches[k*num_patches_per_img+p]),-1)
+        imgs[k] = img
+    return imgs.to(device=device)
+            
+
 
 def load_netG(netG,checkpointname = None):
     checkpoint = torch.load(checkpointname)

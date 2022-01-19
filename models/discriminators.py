@@ -196,10 +196,6 @@ class Patch_Discriminator(nn.Module):
 
         self.model = nn.Sequential(*sequence)
     def forward(self, x,y=None):
-        if y is not None:
-            y = self.embed_y(y).view(-1,self.img_ch,64,64)
-            h= torch.cat((x,y),1)
-        else:
-            h = x    
+        h = x    
         out = self.model(h)
         return out

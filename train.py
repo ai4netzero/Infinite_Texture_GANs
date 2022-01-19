@@ -186,7 +186,11 @@ def train(num_epochs=1, disc_iters=1):
                 D_loss_real.backward()
 
                 # update with fake labels
-                fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
+                if args.G_patch_1D:
+                    fake_x, fake_y = sample_patches_from_gen_1D(args,G_b_size, zdim,args.zdim_b,args.num_patches_per_img, n_cl, netG,device,real_y=real_y)
+                    fake_x = merge_patches_1D(fake_x,args.num_patches_per_img,device)
+                else:
+                    fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
                 fake_logit = netD(fake_x.detach(),fake_y)
                     
                 if loss_fun == 'hinge':  
@@ -205,7 +209,11 @@ def train(num_epochs=1, disc_iters=1):
            # Update G
             netG.zero_grad()
             if args.x_fake_GD is False:
-                fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
+                if args.G_patch_1D:
+                    fake_x, fake_y = sample_patches_from_gen_1D(args,G_b_size, zdim,args.zdim_b,args.num_patches_per_img, n_cl, netG,device,real_y=real_y)
+                    fake_x = merge_patches_1D(fake_x,args.num_patches_per_img)
+                else:
+                    fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
             fake_logit = netD(fake_x,fake_y)
 
             if loss_fun == 'hinge':
