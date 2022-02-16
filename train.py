@@ -154,9 +154,11 @@ def train(num_epochs=1, disc_iters=1):
         running_examples_D = 0
         running_examples_G = 0
 
+
+        #print(epoch)
         # For each mini-batch in the dataloader
         for i, data in enumerate(dataloader, 0):
-            
+            #print(i)
             real_x = data[0].to(device)
             # label 
             if n_cl > 0:
@@ -189,6 +191,9 @@ def train(num_epochs=1, disc_iters=1):
                 if args.G_patch_1D:
                     fake_x, fake_y = sample_patches_from_gen_1D(args,G_b_size, zdim,args.zdim_b,args.num_patches_per_img, n_cl, netG,device,real_y=real_y)
                     fake_x = merge_patches_1D(fake_x,args.num_patches_per_img,device)
+                elif args.G_patch_2D:
+                    fake_x, fake_y = sample_patches_from_gen_2D(args,G_b_size, zdim,args.zdim_b,args.num_patches_h,args.num_patches_w, n_cl, netG,device,real_y=real_y)
+                    fake_x = merge_patches_2D(fake_x,h = args.num_patches_h,w = args.num_patches_w,device = device)
                 else:
                     fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
                 fake_logit = netD(fake_x.detach(),fake_y)
@@ -212,6 +217,9 @@ def train(num_epochs=1, disc_iters=1):
                 if args.G_patch_1D:
                     fake_x, fake_y = sample_patches_from_gen_1D(args,G_b_size, zdim,args.zdim_b,args.num_patches_per_img, n_cl, netG,device,real_y=real_y)
                     fake_x = merge_patches_1D(fake_x,args.num_patches_per_img)
+                elif args.G_patch_2D:
+                    fake_x, fake_y = sample_patches_from_gen_2D(args,G_b_size, zdim,args.zdim_b,args.num_patches_h,args.num_patches_w, n_cl, netG,device,real_y=real_y)
+                    fake_x = merge_patches_2D(fake_x,h = args.num_patches_h,w = args.num_patches_w,device = device)
                 else:
                     fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
             fake_logit = netD(fake_x,fake_y)

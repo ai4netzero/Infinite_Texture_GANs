@@ -146,13 +146,15 @@ class ResBlockGenerator(nn.Module):
         self.conv2 = conv3x3(hidden_channels,out_channels,SN).apply(init_weight)
         self.conv3 = conv1x1(in_channels,out_channels,SN).apply(init_weight)
         self.upsampling = nn.Upsample(scale_factor=2)
-        self.n_cl = n_classes # number of classes
-        if n_classes == 0:
+
+        if n_classes == 0 and 'conv' not in cond_method:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(hidden_channels)
+            self.condnorm = False
         else:                
             self.bn1 = ConditionalNorm(in_channels,n_classes,SN= SN,cond_method=cond_method)
             self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=SN,cond_method=cond_method)
+            self.condnorm = True
 
         if leak >0:
             self.activation = nn.LeakyReLU(leak)
@@ -171,7 +173,7 @@ class ResBlockGenerator(nn.Module):
             return x
 
     def forward(self, x,y=None):
-        if self.n_cl >0:
+        if self.condnorm >0:
             out = self.activation(self.bn1(x,y))
         else:
             out = self.activation(self.bn1(x))
@@ -180,7 +182,7 @@ class ResBlockGenerator(nn.Module):
              out = self.upsampling(out)
 
         out = self.conv1(out)
-        if self.n_cl >0:
+        if self.condnorm >0:
             out = self.activation(self.bn2(out,y))
         else:
             out = self.activation(self.bn2(out))

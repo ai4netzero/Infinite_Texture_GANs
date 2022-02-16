@@ -121,6 +121,12 @@ def prepare_parser():
                         ,help ='dimension of border z')
     parser.add_argument('--num_patches_per_img', type=int, default=2
                         ,help ='num_patches_per_img')
+    parser.add_argument('--G_patch_2D',default=False,action='store_true'
+                       , help = 'Generate patches in 2D')
+    parser.add_argument('--num_patches_w', type=int, default=2
+                        ,help ='num_patches_w')
+    parser.add_argument('--num_patches_h', type=int, default=2
+                        ,help ='num_patches_h')                      
 
     # GPU settings
     parser.add_argument('--ngpu', type=int, default=1
@@ -273,7 +279,7 @@ def prepare_models(args,n_cl = 0,device = 'cpu'):
                                     ,SN_y = args.SN_y).to(device)
 
     elif args.D_model == 'patch_GAN':
-        netD = discriminators.Patch_Discriminator(img_ch=args.img_ch,base_ch = 64,n_layers_D=args.n_layers_D,kw = 4
+        netD = discriminators.Patch_Discriminator(img_ch=args.img_ch,base_ch = args.D_ch,n_layers_D=args.n_layers_D,kw = 4
                                     ,SN= args.spec_norm_D,norm_layer = args.norm_layer_D).to(device)
     return netG,netD
 
@@ -415,9 +421,47 @@ def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num
     
     return fake, y_D
 
-def merge_patches_1D(patches,num_patches_per_img,device):
+def sample_patches_from_gen_2D(args,b_size, zdim,zdim_b,num_patches_h,num_patches_w, num_classes,netG,device ='cpu',real_y = None): 
+
+    # latent z
+    if args.z_dist == 'normal': 
+        z = torch.randn(b_size, zdim).to(device=device)
+    elif args.z_dist =='uniform':
+        z =2*torch.rand(b_size, zdim).to(device=device) -1
+
+    #border z
+    h = num_patches_h
+    w = num_patches_w
+    num_patches_per_img = h*w
+
+    z_b = torch.randn(b_size, zdim_b,zdim_b).to(device)
+
+    for k in range(b_size//num_patches_per_img): # for each image
+        for p in range(0,num_patches_per_img-1):
+            if (p+1) % w != 0:
+                z_b[k*num_patches_per_img+p+1,:,0] = z_b[k*num_patches_per_img+p,:,-1]
+            if (p+w) < num_patches_per_img:
+                z_b[k*num_patches_per_img+p+w,0,:] = z_b[k*num_patches_per_img+p,-1,:]
+    
+    #labels
+    #if num_classes>0:
+    #    if args.y_real_GD:
+    #        y_D = real_y
+    #        y_G = real_y
+    #    else:
+    #        y_D,y_G = sample_pseudo_labels(args,num_classes,b_size,device)
+    #else:
+    #    y_D,y_G = None,None
+
+    y_G = z_b
+    y_D = None
+    fake = netG(z, y_G)
+    
+    return fake, y_D
+
+def merge_patches_1D(patches,num_patches_per_img,device='cpu'):
     b_size = patches.size(0)
-    imgs = torch.empty(b_size//num_patches_per_img,patches.size(1),patches.size(2),patches.size(3)*num_patches_per_img)
+    imgs = torch.empty(b_size//num_patches_per_img,patches.size(1),patches.size(2),patches.size(3)*num_patches_per_img).to(device=device)
     for k in range(b_size//num_patches_per_img): # for each image
         img = patches[k*num_patches_per_img]
         for p in range(1,num_patches_per_img):
@@ -425,7 +469,21 @@ def merge_patches_1D(patches,num_patches_per_img,device):
         imgs[k] = img
     return imgs.to(device=device)
             
-
+def merge_patches_2D(patches,h=3,w=3,device = 'cpu'):
+    b_size = patches.size(0)
+    num_patches_per_img = h*w
+    imgs = torch.empty(b_size//num_patches_per_img,patches.size(1),patches.size(2)*h,patches.size(3)*w).to(device=device)
+    
+    for k in range(b_size//num_patches_per_img): # for each image
+        img = torch.tensor([]).to(device=device)
+        for r in range(h): # each row in each image
+            img_r = patches[k*num_patches_per_img+r*w]
+            for c in range(1,w):
+                img_r = torch.cat((img_r,patches[k*num_patches_per_img+r*w+c]),-1)
+            img = torch.cat((img,img_r),-2) # concatenate rows
+        imgs[k] = img
+    return imgs.to(device=device)
+            
 
 def load_netG(netG,checkpointname = None):
     checkpoint = torch.load(checkpointname)
