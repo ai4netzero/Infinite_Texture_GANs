@@ -40,6 +40,10 @@ def prepare_parser():
                        ,help = 'csv path')
     parser.add_argument('--data_ext', type=str, default='txt'
                        ,help = 'data extension txt, png')
+    parser.add_argument('--center_crop', type=int, default=None
+                       ,help = 'center cropping')
+    parser.add_argument('--random_crop', type=int, default=None
+                       ,help = 'random cropping')                                     
                         
     parser.add_argument('--sampling', type=int, default=None
                        ,help = 'randomly sample --sampling instances from the training data if not None')
@@ -230,7 +234,9 @@ def prepare_data(args):
         train_data = channel_datasets.Channels(path = args.data_path
                                                 ,csv_path = args.csv_path
                                                 ,ext = args.data_ext
-                                                ,sampling = args.sampling)
+                                                ,sampling = args.sampling
+                                                ,random_crop = args.random_crop
+                                                ,center_crop = args.center_crop)
 
     else:
         print('no data named :',args.data)

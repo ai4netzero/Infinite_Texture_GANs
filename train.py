@@ -171,7 +171,7 @@ def train(num_epochs=1, disc_iters=1):
                 real_y = None
 
             b_size = real_x.size(0)
-            G_b_size = b_size
+            #G_b_size = b_size
             # Update D network
             for _ in range(disc_iters): 
                 netD.zero_grad()
