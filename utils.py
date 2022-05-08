@@ -235,6 +235,7 @@ def prepare_data(args):
         from datasets import datasets_classes
         train_data = datasets_classes.single_image(path = args.data_path
                                                 ,ext = args.data_ext
+                                                ,sampling = args.sampling
                                                 ,random_crop = args.random_crop
                                                 ,center_crop = args.center_crop)
 
