@@ -43,7 +43,7 @@ def prepare_parser():
     parser.add_argument('--center_crop', type=int, default=None
                        ,help = 'center cropping')
     parser.add_argument('--random_crop', type=int, default=None
-                       ,help = 'random cropping')                                     
+                       ,help = 'random cropping')                                                    
                         
     parser.add_argument('--sampling', type=int, default=None
                        ,help = 'randomly sample --sampling instances from the training data if not None')
@@ -213,14 +213,8 @@ def init_weight(m):
 #dataset
 def prepare_data(args):
     print(" laoding " +args.data +" ...")
-    if args.data == 'dogs':
-        from datasets import Dogs_labels
-        train_data = Dogs_labels.DogsDataset()
-        dataloader = torch.utils.data.DataLoader(train_data,
-                               shuffle=True, batch_size=args.batch_size,
-                               num_workers=12,pin_memory=True)
 
-    elif  args.data == 'cifar':
+    if  args.data == 'cifar':
         train_data = dset.CIFAR10(root='./data', train=True, download=True,
                                    transform=transforms.Compose([
                                        # transforms.Resize(image_size),
@@ -230,11 +224,17 @@ def prepare_data(args):
                                    ]))
 
     elif args.data == 'channels':
-        from datasets import channel_datasets
-        train_data = channel_datasets.Channels(path = args.data_path
+        from datasets import datasets_classes
+        train_data = datasets_classes.Channels(path = args.data_path
                                                 ,csv_path = args.csv_path
                                                 ,ext = args.data_ext
                                                 ,sampling = args.sampling
+                                                ,random_crop = args.random_crop
+                                                ,center_crop = args.center_crop)
+    elif args.data == 'single_image':
+        from datasets import datasets_classes
+        train_data = datasets_classes.single_image(path = args.data_path
+                                                ,ext = args.data_ext
                                                 ,random_crop = args.random_crop
                                                 ,center_crop = args.center_crop)
 
@@ -464,6 +464,9 @@ def sample_patches_from_gen_2D(args,b_size, zdim,zdim_b,num_patches_h,num_patche
     fake = netG(z, y_G)
     
     return fake, y_D
+
+
+
 
 def merge_patches_1D(patches,num_patches_per_img,device='cpu'):
     b_size = patches.size(0)
