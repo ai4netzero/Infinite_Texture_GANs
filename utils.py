@@ -444,6 +444,7 @@ def sample_patches_from_gen_2D(args,b_size, zdim,zdim_b,num_patches_h,num_patche
     z_b = torch.randn(b_size, zdim_b,zdim_b).to(device)
 
     for k in range(b_size//num_patches_per_img): # for each image
+        z[k*num_patches_per_img:(k+1)*num_patches_per_img] = z[k*num_patches_per_img] # fixing z (global z)
         for p in range(0,num_patches_per_img-1):
             if (p+1) % w != 0:
                 z_b[k*num_patches_per_img+p+1,:,0] = z_b[k*num_patches_per_img+p,:,-1]
