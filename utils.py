@@ -441,10 +441,13 @@ def sample_patches_from_gen_2D(args,b_size, zdim,zdim_b,num_patches_h,num_patche
     w = num_patches_w
     num_patches_per_img = h*w
 
-    z_b = torch.randn(b_size, zdim_b,zdim_b).to(device)
+    z_b_merged =  torch.randn(b_size//num_patches_per_img,(h+2)* zdim_b,(w+2)*zdim_b).to(device)
+
+    z_b = crop_fun_(z_b_merged,1,device = device)
+    z_b = torch.randn(b_size,zdim_b,h* zdim_b,w*zdim_b).to(device)
 
     for k in range(b_size//num_patches_per_img): # for each image
-        z[k*num_patches_per_img:(k+1)*num_patches_per_img] = z[k*num_patches_per_img] # fixing z (global z)
+        #z[k*num_patches_per_img:(k+1)*num_patches_per_img] = z[k*num_patches_per_img] # fixing z (global z)
         for p in range(0,num_patches_per_img-1):
             if (p+1) % w != 0:
                 z_b[k*num_patches_per_img+p+1,:,0] = z_b[k*num_patches_per_img+p,:,-1]
@@ -563,3 +566,31 @@ def replace_face(img,old_face,new_face):
                 new_img[x,y,:] =  new_face
     return new_img
                 
+def crop_fun(img,cropping_size = 256,stride = 256):
+    img_h = img.shape[0]
+    img_w=  img.shape[1]
+    good_crops = []
+    start_h = 0
+    end_h = cropping_size
+    while(start_h<img_h):
+        start_w = 0
+        end_w = cropping_size
+        while(start_w<img_w):
+            #crop
+            crop = img[start_h:end_h,start_w:end_w]
+            good_crops.append(crop)
+            start_w+= stride
+            end_w+=stride 
+        start_h+= stride
+        end_h+=stride
+    return good_crops
+
+def crop_fun_(img,cropping_size = 256,stride = 256,device='cpu'): # for a mini-batch
+    img = img.copy()
+    N = img.shape[0] # images in batch
+    batch_patches = torch.tensor([])
+    for l in range(N):
+        crops =  torch.tensor(np.array(crop_fun(img[l,:,:],cropping_size = cropping_size,stride = stride)))
+        batch_patches = torch.cat((batch_patches,crops),0)
+
+    return batch_patches.to(device=device)
