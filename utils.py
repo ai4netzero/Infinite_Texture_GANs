@@ -441,29 +441,20 @@ def sample_patches_from_gen_2D(args,b_size, zdim,zdim_b,num_patches_h,num_patche
     w = num_patches_w
     num_patches_per_img = h*w
 
-    z_b_merged =  torch.randn(b_size//num_patches_per_img,(h+2)* zdim_b,(w+2)*zdim_b).to(device)
+    z_b_merged =  torch.randn(b_size//num_patches_per_img,(h+2)* zdim_b,(w+2)*zdim_b).numpy()
 
-    z_b = crop_fun_(z_b_merged,1,device = device)
-    z_b = torch.randn(b_size,zdim_b,h* zdim_b,w*zdim_b).to(device)
-
-    for k in range(b_size//num_patches_per_img): # for each image
-        #z[k*num_patches_per_img:(k+1)*num_patches_per_img] = z[k*num_patches_per_img] # fixing z (global z)
-        for p in range(0,num_patches_per_img-1):
-            if (p+1) % w != 0:
-                z_b[k*num_patches_per_img+p+1,:,0] = z_b[k*num_patches_per_img+p,:,-1]
-            if (p+w) < num_patches_per_img:
-                z_b[k*num_patches_per_img+p+w,0,:] = z_b[k*num_patches_per_img+p,-1,:]
+    z_b = crop_fun_(z_b_merged,3*zdim_b,zdim_b,device = device)
     
-    #labels
-    #if num_classes>0:
-    #    if args.y_real_GD:
-    #        y_D = real_y
-    #        y_G = real_y
-    #    else:
-    #        y_D,y_G = sample_pseudo_labels(args,num_classes,b_size,device)
-    #else:
-    #    y_D,y_G = None,None
+    #z_b = torch.randn(b_size,zdim_b,h* zdim_b,w*zdim_b).to(device)
 
+    #for k in range(b_size//num_patches_per_img): # for each image
+    #    #z[k*num_patches_per_img:(k+1)*num_patches_per_img] = z[k*num_patches_per_img] # fixing z (global z)
+    #    for p in range(0,num_patches_per_img-1):
+    #        if (p+1) % w != 0:
+    #            z_b[k*num_patches_per_img+p+1,:,0] = z_b[k*num_patches_per_img+p,:,-1]
+    #        if (p+w) < num_patches_per_img:
+    #            z_b[k*num_patches_per_img+p+w,0,:] = z_b[k*num_patches_per_img+p,-1,:]
+    
     y_G = z_b
     y_D = None
     fake = netG(z, y_G)
@@ -572,10 +563,10 @@ def crop_fun(img,cropping_size = 256,stride = 256):
     good_crops = []
     start_h = 0
     end_h = cropping_size
-    while(start_h<img_h):
+    while(end_h<=img_h):
         start_w = 0
         end_w = cropping_size
-        while(start_w<img_w):
+        while(end_w<=img_w):
             #crop
             crop = img[start_h:end_h,start_w:end_w]
             good_crops.append(crop)
