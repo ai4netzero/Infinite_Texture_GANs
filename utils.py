@@ -74,6 +74,8 @@ def prepare_parser():
                        ,help = 'apply spectral normalization in generator')
     parser.add_argument('--n_layers_D', type=int, default=3
                        ,help = 'number of layers used in discriminator of dcgan,patchGAN')
+    parser.add_argument('--n_layers_G', type=int, default=4
+                       ,help = 'number of layers used in generator') 
     parser.add_argument('--norm_layer_D', type=str, default=None
                        ,help = 'normalization layer in patchGAN')
 
@@ -262,7 +264,8 @@ def prepare_models(args,n_cl = 0,device = 'cpu'):
         netG = generators.Res_Generator(args.zdim,img_ch=args.img_ch,n_classes = n_cl
                                         ,base_ch = args.G_ch,leak = args.leak_G,att = args.att
                                         ,SN = args.spec_norm_G
-                                        ,cond_method = args.G_cond_method).to(device)
+                                        ,cond_method = args.G_cond_method
+                                        ,n_layers_G = args.n_layers_G).to(device)
 
     if args.D_model == 'dcgan':
         netD = discriminators.DC_Discriminator(img_ch=args.img_ch
@@ -460,8 +463,6 @@ def sample_patches_from_gen_2D(args,b_size, zdim,zdim_b,num_patches_h,num_patche
     fake = netG(z, y_G)
     
     return fake, y_D
-
-
 
 
 def merge_patches_1D(patches,num_patches_per_img,device='cpu'):

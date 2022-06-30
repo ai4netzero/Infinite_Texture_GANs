@@ -8,13 +8,14 @@ from models.layers import *
         
 
 class Res_Generator(nn.Module):
-    def __init__(self,z_dim =128,img_ch=3,base_ch =64,n_classes = 0,leak = 0,att = False,SN=False,cond_method = 'cbn'):
+    def __init__(self,z_dim =128,img_ch=3,base_ch =64,n_classes = 0,leak = 0,att = False,SN=False,cond_method = 'cbn',n_layers_G=4):
         super(Res_Generator, self).__init__()
 
         self.base_ch = base_ch
         self.n_classes = n_classes
         self.att = att
         self.cond_method = cond_method
+        self.n_layers_G = n_layers_G
         if self.cond_method == 'concat':
             z_dim = z_dim+n_classes
             n_classes = 0
@@ -33,9 +34,13 @@ class Res_Generator(nn.Module):
         if att:
             self.attention = Attention(base_ch*2,SN=SN)
         self.block4 = ResBlockGenerator(base_ch*2, base_ch,upsample=True,n_classes = n_classes,leak = leak,SN=SN,cond_method=cond_method)
-        
-        self.bn = nn.BatchNorm2d(base_ch)
-        self.final = conv3x3(base_ch,img_ch,SN = SN).apply(init_weight)
+        if n_layers_G==5:
+            final_chin = base_ch//2
+            self.block5 = ResBlockGenerator(base_ch, base_ch//2,upsample=True,n_classes = n_classes,leak = leak,SN=SN,cond_method=cond_method)
+        else:
+            final_chin = base_ch
+        self.bn = nn.BatchNorm2d(final_chin)
+        self.final = conv3x3(final_chin,img_ch,SN = SN).apply(init_weight)
 
     def forward(self, z,y=None):
         if self.cond_method =='concat':
@@ -48,6 +53,8 @@ class Res_Generator(nn.Module):
         if self.att:
             h = self.attention(h)
         h = self.block4(h,y)
+        if self.n_layers_G ==5:
+            h = self.block5(h,y)#128x128
         h = self.bn(h)
         h = self.activation(h)
         h = self.final(h)
