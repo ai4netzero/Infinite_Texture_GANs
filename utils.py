@@ -414,16 +414,6 @@ def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num
     for k in range(b_size//num_patches_per_img): # for each image
         for p in range(1,num_patches_per_img):
             z_b[k*num_patches_per_img+p,:,0] = z_b[k*num_patches_per_img+p-1,:,-1]
-    
-    #labels
-    #if num_classes>0:
-    #    if args.y_real_GD:
-    #        y_D = real_y
-    #        y_G = real_y
-    #    else:
-    #        y_D,y_G = sample_pseudo_labels(args,num_classes,b_size,device)
-    #else:
-    #    y_D,y_G = None,None
 
     y_G = z_b
     y_D = None
@@ -443,21 +433,15 @@ def sample_patches_from_gen_2D(args,b_size, zdim,zdim_b,num_patches_h,num_patche
     h = num_patches_h
     w = num_patches_w
     num_patches_per_img = h*w
+    n_imgs = b_size//num_patches_per_img
 
-    z_b_merged =  torch.randn(b_size//num_patches_per_img,(h+2)* zdim_b,(w+2)*zdim_b).numpy()
+    # Generate global stochastic map for each image. (+2 is added for padding: two rows and two columns)
+    z_b_merged =  torch.randn(n_imgs,(h+2)* zdim_b,(w+2)*zdim_b).numpy()
 
+    # Crop the large map into smaller map for each image patch. The cropping size is 3x3, i.e., 8 surrounding patches.
     z_b = crop_fun_(z_b_merged,3*zdim_b,zdim_b,device = device)
     
-    #z_b = torch.randn(b_size,zdim_b,h* zdim_b,w*zdim_b).to(device)
-
-    #for k in range(b_size//num_patches_per_img): # for each image
-    #    #z[k*num_patches_per_img:(k+1)*num_patches_per_img] = z[k*num_patches_per_img] # fixing z (global z)
-    #    for p in range(0,num_patches_per_img-1):
-    #        if (p+1) % w != 0:
-    #            z_b[k*num_patches_per_img+p+1,:,0] = z_b[k*num_patches_per_img+p,:,-1]
-    #        if (p+w) < num_patches_per_img:
-    #            z_b[k*num_patches_per_img+p+w,0,:] = z_b[k*num_patches_per_img+p,-1,:]
-    
+    #Make the map as an additional input to netG.
     y_G = z_b
     y_D = None
     fake = netG(z, y_G)
