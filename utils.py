@@ -174,8 +174,9 @@ def prepare_parser():
 def prepare_device(args):
     # Device
     ngpu = args.ngpu
-    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.dev_num)
+    if ngpu==1:
+        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.dev_num)
     device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
     print("Device: ",device)
     return device
