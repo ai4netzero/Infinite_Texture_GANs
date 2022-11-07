@@ -43,7 +43,11 @@ def prepare_parser():
     parser.add_argument('--center_crop', type=int, default=None
                        ,help = 'center cropping')
     parser.add_argument('--random_crop', type=int, default=None
-                       ,help = 'random cropping')                                                    
+                       ,help = 'random cropping')
+    parser.add_argument('--random_crop_h', type=int, default=None
+                       ,help = 'random cropping for h ')
+    parser.add_argument('--random_crop_w', type=int, default=None
+                       ,help = 'random cropping for w')                                                      
                         
     parser.add_argument('--sampling', type=int, default=None
                        ,help = 'randomly sample --sampling instances from the training data if not None')
