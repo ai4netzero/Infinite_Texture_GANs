@@ -571,3 +571,34 @@ def crop_fun_(img,cropping_size = 256,stride = 256,device='cpu'): # for a mini-b
         batch_patches = torch.cat((batch_patches,crops),0)
 
     return batch_patches.to(device=device)
+
+
+def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init=None):
+    if coord_init is None:
+        coord_init = (0, 0) # Workaround
+    if norm_height is None:
+        norm_height = height
+    if norm_width is None:
+        norm_width = width
+
+    x_range = torch.arange(width).type(torch.float32)  + coord_init[1]
+    y_range = torch.arange(height).type(torch.float32) + coord_init[0] 
+
+    #[-1,1] # larger during testing
+    x_range =(x_range/(norm_width-1))*2-1
+    y_range =(y_range/(norm_height-1))*2-1
+
+    x_coords = x_range.view(1, -1).repeat(height, 1) # [height, width]
+    y_coords = y_range.view(-1, 1).repeat(1, width) # [height, width]
+    
+    #print(x_coords.shape)
+    #print(y_coords.shape)
+    grid = torch.cat([
+            x_coords.unsqueeze(0), # apply cos later
+            x_coords.unsqueeze(0), # apply sin later
+            y_coords.unsqueeze(0), # apply cos later
+            y_coords.unsqueeze(0), # apply sin later
+        ], 0)
+    
+    return grid
+
