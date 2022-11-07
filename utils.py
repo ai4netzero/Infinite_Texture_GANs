@@ -78,7 +78,8 @@ def prepare_parser():
                        ,help = 'number of layers used in generator') 
     parser.add_argument('--norm_layer_D', type=str, default=None
                        ,help = 'normalization layer in patchGAN')
-
+    parser.add_argument('--base_res', type=int, default=4
+                       ,help = 'base resolution for G') 
 
     # optimizers settings
     parser.add_argument('--lr_G', type=float, default=2e-4
@@ -123,8 +124,8 @@ def prepare_parser():
                         ,help='Use same fake data for both G and D')
     parser.add_argument('--G_patch_1D',default=False,action='store_true'
                        , help = 'Generate patches in 1D')
-    parser.add_argument('--zdim_b', type=int, default=4
-                        ,help ='dimension of border z')
+    parser.add_argument('--m_dim', type=int, default=4
+                        ,help ='dimension of map m')
     parser.add_argument('--num_patches_per_img', type=int, default=2
                         ,help ='num_patches_per_img')
     parser.add_argument('--G_patch_2D',default=False,action='store_true'
@@ -133,6 +134,12 @@ def prepare_parser():
                         ,help ='num_patches_w')
     parser.add_argument('--num_patches_h', type=int, default=2
                         ,help ='num_patches_h')                      
+    parser.add_argument('--coord_emb_dim', type=int, default=4
+                        ,help ='coord_emb_dim')   
+    parser.add_argument('--use_coord',default=False,action='store_true'
+                       , help = 'Use coordconv')
+    parser.add_argument('--period_coef',type=int, default=1
+                        ,help ='period_coef')
 
     # GPU settings
     parser.add_argument('--ngpu', type=int, default=1
@@ -262,11 +269,7 @@ def prepare_models(args,n_cl = 0,device = 'cpu'):
         netG.apply(init_weight)
 
     elif args.G_model == 'residual_GAN':
-        netG = generators.Res_Generator(args.zdim,img_ch=args.img_ch,n_classes = n_cl
-                                        ,base_ch = args.G_ch,leak = args.leak_G,att = args.att
-                                        ,SN = args.spec_norm_G
-                                        ,cond_method = args.G_cond_method
-                                        ,n_layers_G = args.n_layers_G).to(device)
+        netG = generators.Res_Generator(args,n_classes = n_cl).to(device)
 
     if args.D_model == 'dcgan':
         netD = discriminators.DC_Discriminator(img_ch=args.img_ch
@@ -422,30 +425,44 @@ def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num
     
     return fake, y_D
 
-def sample_patches_from_gen_2D(args,b_size, zdim,zdim_b,num_patches_h,num_patches_w, num_classes,netG,device ='cpu',real_y = None): 
+def sample_patches_from_gen_2D(args,b_size,netG,coord_grids,device ='cpu'): 
 
     # latent z
     if args.z_dist == 'normal': 
-        z = torch.randn(b_size, zdim).to(device=device)
+        z = torch.randn(b_size, args.zdim).to(device=device)
     elif args.z_dist =='uniform':
-        z =2*torch.rand(b_size, zdim).to(device=device) -1
+        z =2*torch.rand(b_size, args.zdim).to(device=device) -1
 
     #border z
-    h = num_patches_h
-    w = num_patches_w
+    h = args.num_patches_h
+    w = args.num_patches_w
     num_patches_per_img = h*w
     n_imgs = b_size//num_patches_per_img
 
     # Generate global stochastic map for each image. (+2 is added for padding: two rows and two columns)
-    z_b_merged =  torch.randn(n_imgs,(h+2)* zdim_b,(w+2)*zdim_b).numpy()
+    maps_merged =  torch.randn(n_imgs,1,(h+2)* args.m_dim,(w+2)*args.m_dim)#.numpy()
 
     # Crop the large map into smaller map for each image patch. The cropping size is 3x3, i.e., 8 surrounding patches.
-    z_b = crop_fun_(z_b_merged,3*zdim_b,zdim_b,device = device)
+    maps = crop_fun_(maps_merged,3*args.m_dim,3*args.m_dim,args.m_dim,device = device)
     
+
+
+    if args.use_coord:
+        local_grids = []
+        #sample coordinate grids
+        for grid in coord_grids: # grids for different resolutions 4,8, .. 
+            grid = grid.unsqueeze(0).repeat(n_imgs, 1,1,1) # repeat for number of images (n_imgs,emb_dim = 4, h*res,w*res)
+            local_coord_grid = crop_fun_(grid,grid.size(2)//h,grid.size(3)//w,grid.size(2),device = device)
+            local_grids.append(local_coord_grid)
+        local_grids = torch.stack(local_grids)
+    else:
+        local_grids = None
+    
+
     #Make the map as an additional input to netG.
-    y_G = z_b
+    y_G = maps
     y_D = None
-    fake = netG(z, y_G)
+    fake = netG(z, y_G,local_grids)
     
     return fake, y_D
 
@@ -543,7 +560,7 @@ def replace_face(img,old_face,new_face):
                 new_img[x,y,:] =  new_face
     return new_img
                 
-def crop_fun(img,cropping_size = 256,stride = 256):
+'''def crop_fun(img,cropping_size = 256,stride = 256):
     img_h = img.shape[0]
     img_w=  img.shape[1]
     good_crops = []
@@ -570,10 +587,45 @@ def crop_fun_(img,cropping_size = 256,stride = 256,device='cpu'): # for a mini-b
         crops =  torch.tensor(np.array(crop_fun(img[l,:,:],cropping_size = cropping_size,stride = stride)))
         batch_patches = torch.cat((batch_patches,crops),0)
 
+    return batch_patches.to(device=device)'''
+
+def crop_fun(img,cropping_size_h = 256,cropping_size_w=256,stride = 256):
+    img_h = img.shape[1]
+    img_w=  img.shape[2]
+    crops = torch.tensor([])
+
+    start_h = 0
+    end_h = cropping_size_h
+    #print(img_h)
+    #print(cropping_size_h)
+    while(end_h<=img_h):
+        #print('h')
+        start_w = 0
+        end_w = cropping_size_w
+        while(end_w<=img_w):
+            #print('w')
+            #crop
+            crop = img[:,start_h:end_h,start_w:end_w]
+            crops = torch.cat((crops,crop.unsqueeze(0)))
+            start_w+= stride
+            end_w+=stride 
+        start_h+= stride
+        end_h+=stride
+    return crops
+
+def crop_fun_(img,cropping_size_h = 256,cropping_size_w=256,stride = 256,device='cpu'): # for a mini-batch
+    img = img.clone()
+    N = img.shape[0] # images in batch
+    batch_patches = torch.tensor([])
+    for l in range(N):
+        #print(l)
+        crops =  crop_fun(img[l,:,:,:],cropping_size_h = cropping_size_h,cropping_size_w=cropping_size_w,stride = stride)
+        batch_patches = torch.cat((batch_patches,crops),0)
+
     return batch_patches.to(device=device)
 
 
-def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init=None):
+def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init=None, coef=1):
     if coord_init is None:
         coord_init = (0, 0) # Workaround
     if norm_height is None:
@@ -594,11 +646,16 @@ def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init
     #print(x_coords.shape)
     #print(y_coords.shape)
     grid = torch.cat([
-            x_coords.unsqueeze(0), # apply cos later
+            x_coords.unsqueeze(0), # apply cos later 
             x_coords.unsqueeze(0), # apply sin later
             y_coords.unsqueeze(0), # apply cos later
             y_coords.unsqueeze(0), # apply sin later
-        ], 0)
+        ], 0)  #[4,H,W]
     
+
+    grid[0, :,:] = torch.cos(grid[0, :,:] * np.pi*coef)
+    grid[1, :,:] = torch.sin(grid[1, :,:] * np.pi*coef)
+    grid[2, :,:] = torch.cos(grid[2, :,:] * np.pi*coef)
+    grid[3, :,:] = torch.cos(grid[3, :,:] * np.pi*coef)
     return grid
 

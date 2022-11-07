@@ -4,6 +4,8 @@ import torch.nn.utils.spectral_norm as SpectralNorm
 import numpy as np
 import torch
 import torch.nn.functional as F
+from utils import *
+
 
 def conv3x3(ch_in,ch_out,SN = False,s = 1,p=1,bias = True):
     if SN:
@@ -135,44 +137,49 @@ class Attention(nn.Module):
     
     
 class ResBlockGenerator(nn.Module):
-    def __init__(self, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0, leak = 0,SN = False,cond_method = 'cbn'):
+    def __init__(self,args, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0):
         super(ResBlockGenerator, self).__init__()
         hidden_channels = out_channels if hidden_channels is None else hidden_channels
         
         self.upsample = upsample
         self.learnable_sc = (in_channels != out_channels) or upsample
-        
-        self.conv1 = conv3x3(in_channels,hidden_channels,SN).apply(init_weight)
-        self.conv2 = conv3x3(hidden_channels,out_channels,SN).apply(init_weight)
-        self.conv3 = conv1x1(in_channels,out_channels,SN).apply(init_weight)
+
+        # setting dim = 0 when no cooord used
+        if not args.use_coords: 
+            args.coord_emb_dim = 0
+
+
+        self.conv1 = conv3x3(in_channels+args.coord_emb_dim,hidden_channels,args.SN).apply(init_weight)
+        self.conv2 = conv3x3(hidden_channels+args.coord_emb_dim,out_channels,args.SN).apply(init_weight)
+        self.conv3 = conv1x1(in_channels+args.coord_emb_dim,out_channels,args.SN).apply(init_weight)
         self.upsampling = nn.Upsample(scale_factor=2)
 
-        if n_classes == 0 and 'conv' not in cond_method:
+        if n_classes == 0 and 'conv' not in args.cond_method:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(hidden_channels)
             self.condnorm = False
         else:                
-            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= SN,cond_method=cond_method)
-            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=SN,cond_method=cond_method)
+            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= args.SN,cond_method=args.cond_method)
+            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=args.SN,cond_method=args.cond_method)
             self.condnorm = True
 
-        if leak >0:
-            self.activation = nn.LeakyReLU(leak)
+        if args.leak >0:
+            self.activation = nn.LeakyReLU(args.leak)
         else:
             self.activation = nn.ReLU() 
 
-    def shortcut(self, x):
+    def shortcut(self, x,coord=None):
         if self.learnable_sc:
             if self.upsample:
                 x = self.upsampling(x)
-                x = self.conv3(x)
-            else:
-                x = self.conv3(x)
+            if coord:
+                x = torch.cat((x,coord),1)
+            x = self.conv3(x)
             return x
         else:
             return x
 
-    def forward(self, x,y=None):
+    def forward(self, x,y=None,coord=None):
         if self.condnorm >0:
             out = self.activation(self.bn1(x,y))
         else:
@@ -181,14 +188,20 @@ class ResBlockGenerator(nn.Module):
         if self.upsample:
              out = self.upsampling(out)
 
+        if coord:
+            out = torch.cat((out,coord),1)
+
         out = self.conv1(out)
         if self.condnorm >0:
             out = self.activation(self.bn2(out,y))
         else:
             out = self.activation(self.bn2(out))
 
+        if coord:
+            out = torch.cat((out,coord),1)
+
         out = self.conv2(out)
-        out_res = self.shortcut(x)
+        out_res = self.shortcut(x,coord)
         return out + out_res
 
 class ResBlockDiscriminator(nn.Module):
