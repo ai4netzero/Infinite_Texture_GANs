@@ -462,10 +462,12 @@ def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grids,device ='cpu'):
     # Crop the large map into smaller map for each image patch. The cropping size is 3x3, i.e., 8 surrounding patches.
     maps = crop_fun_(maps_merged,args.num_neighbors*args.m_dim,args.num_neighbors*args.m_dim,args.m_dim,device = device) #(bs,1,3*m_dim,3*m_dim)
     
-    # random sample grid for each image
-    sampled_coord_grids = random_sample_coord_grid(meta_coord_grids,args.num_patches_h,args.num_patches_w)  # (#resols,n_imgs,emb_dim,h*res,w*res)
+   
 
     if args.use_coord:
+         # random sample grid for each image
+        sampled_coord_grids = random_sample_coord_grid(args,meta_coord_grids,args.num_patches_h,args.num_patches_w,n_imgs)  # (#resols,n_imgs,emb_dim,h*res,w*res)
+        
         local_grids = []
         #sample coordinate grids
         for grid in sampled_coord_grids: # grids for different resolutions 4,8, .. 
@@ -482,8 +484,12 @@ def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grids,device ='cpu'):
     #print(maps_merged.shape)
     #print(maps.shape)
 
-    #print(grid.shape)
-    #print(local_coord_grid.shape)
+    #print(meta_coord_grids[0].shape)
+    #print(sampled_coord_grids[0].shape)
+    #print(local_grids[0].shape)
+
+    #print(meta_coord_grids[0][1,:,:])
+
 
     #exit()
     #Make the map as an additional input to netG.
@@ -705,10 +711,12 @@ def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init
             y_coords.unsqueeze(0), # apply sin later
         ], 0)  #[4,H,W]
     
-
+    #print(grid[0][0])
     grid[0, :,:] = torch.cos(grid[0, :,:] * np.pi*coef)
     grid[1, :,:] = torch.sin(grid[1, :,:] * np.pi*coef)
     grid[2, :,:] = torch.cos(grid[2, :,:] * np.pi*coef)
-    grid[3, :,:] = torch.cos(grid[3, :,:] * np.pi*coef)
+    grid[3, :,:] = torch.sin(grid[3, :,:] * np.pi*coef)
+    #print(grid[0][0])
+    #exit()
     return grid
 
