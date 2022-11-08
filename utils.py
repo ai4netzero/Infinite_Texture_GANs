@@ -142,7 +142,7 @@ def prepare_parser():
                         ,help ='coord_emb_dim')   
     parser.add_argument('--use_coord',default=False,action='store_true'
                        , help = 'Use coordconv')
-    parser.add_argument('--period_coef',type=int, default=1
+    parser.add_argument('--period_coef',type=float, default=1
                         ,help ='period_coef')
 
     # GPU settings
