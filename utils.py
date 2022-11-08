@@ -126,6 +126,8 @@ def prepare_parser():
                        , help = 'Use smooth labeling if True')
     parser.add_argument('--x_fake_GD', action='store_true' , default=False
                         ,help='Use same fake data for both G and D')
+
+    # patch generation parameters
     parser.add_argument('--G_patch_1D',default=False,action='store_true'
                        , help = 'Generate patches in 1D')
     parser.add_argument('--m_dim', type=int, default=4
@@ -142,9 +144,14 @@ def prepare_parser():
                         ,help ='coord_emb_dim')   
     parser.add_argument('--use_coord',default=False,action='store_true'
                        , help = 'Use coordconv')
-    parser.add_argument('--period_coef',type=float, default=1
+    parser.add_argument('--period_coef',type=float, default=1.0
                         ,help ='period_coef')
-
+    parser.add_argument('--num_neighbors',type=int, default=3
+                        ,help ='num_neighbors')
+    parser.add_argument('--meta_map_h',type=int, default=30
+                        ,help ='height of meta map')
+    parser.add_argument('--meta_map_w',type=int, default=30
+                        ,help ='width of meta map')
     # GPU settings
     parser.add_argument('--ngpu', type=int, default=1
                         ,help = 'number of gpus to be used')                                     
@@ -435,7 +442,7 @@ def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num
     
     return fake, y_D
 
-def sample_patches_from_gen_2D(args,b_size,netG,coord_grids,device ='cpu'): 
+def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grids,device ='cpu'): 
 
     # latent z
     if args.z_dist == 'normal': 
@@ -450,18 +457,20 @@ def sample_patches_from_gen_2D(args,b_size,netG,coord_grids,device ='cpu'):
     n_imgs = b_size//num_patches_per_img
 
     # Generate global stochastic map for each image. (+2 is added for padding: two rows and two columns)
-    maps_merged =  torch.randn(n_imgs,1,(h+2)* args.m_dim,(w+2)*args.m_dim)#.numpy()
+    maps_merged =  torch.randn(n_imgs,1,(h+2)* args.m_dim,(w+2)*args.m_dim)#.numpy() # (n_imgs,1,H,W)
 
     # Crop the large map into smaller map for each image patch. The cropping size is 3x3, i.e., 8 surrounding patches.
-    maps = crop_fun_(maps_merged,3*args.m_dim,3*args.m_dim,args.m_dim,device = device)
+    maps = crop_fun_(maps_merged,args.num_neighbors*args.m_dim,args.num_neighbors*args.m_dim,args.m_dim,device = device) #(bs,1,3*m_dim,3*m_dim)
     
-
+    # random sample grid for each image
+    sampled_coord_grids = random_sample_coord_grid(meta_coord_grids,args.num_patches_h,args.num_patches_w)  # (#resols,n_imgs,emb_dim,h*res,w*res)
 
     if args.use_coord:
         local_grids = []
         #sample coordinate grids
-        for grid in coord_grids: # grids for different resolutions 4,8, .. 
-            grid = grid.unsqueeze(0).repeat(n_imgs, 1,1,1) # repeat for number of images (n_imgs,emb_dim = 4, h*res,w*res)
+        for grid in sampled_coord_grids: # grids for different resolutions 4,8, .. 
+            # use const. grid for all images ( wrong ?)
+            #grid = grid.unsqueeze(0).repeat(n_imgs, 1,1,1) # repeat for number of images (n_imgs,emb_dim = 4, h*res,w*res)
             #print(grid.shape)
             local_coord_grid = crop_fun_(grid,grid.size(2)//h,grid.size(3)//w,grid.size(2)//h,device = device) # (bs,4,res,res)
             #print(local_coord_grid.shape)
@@ -483,6 +492,32 @@ def sample_patches_from_gen_2D(args,b_size,netG,coord_grids,device ='cpu'):
     fake = netG(z, y_G,local_grids)
     
     return fake, y_D
+
+def random_sample_coord_grid(args,meta_grids,y_size=6, x_size= 6,n_imgs = 1):
+    local_grids_res_imgs = [] 
+
+    res = args.base_res*2 # patch res. 
+    for local_grids_imgs in meta_grids: # for each resolution
+        # resolution of img 
+        img_y_size = res * y_size 
+        img_x_size = res * x_size
+        y_st = torch.randint(0,local_grids_imgs.size(1)-img_y_size,(n_imgs,))
+        x_st = torch.randint(0,local_grids_imgs.size(2)-img_x_size,(n_imgs,))
+
+        grids = []
+        for xx, yy in zip(x_st, y_st):
+            grid = local_grids_imgs[:,  yy:yy+img_y_size,xx:xx+img_x_size] # (emb,img_y_size,img_x_size)
+            grids.append(grid)
+
+        grids = torch.stack(grids).contiguous().clone().detach() # (n_imgs,emb,img_y_size,img_x_size)
+        
+        local_grids_res_imgs.append(grids)
+
+        res = res*2
+    return local_grids_res_imgs # (#resol,n_imgs,emb,img_y_size,img_x_size)
+
+
+
 
 
 def merge_patches_1D(patches,num_patches_per_img,device='cpu'):
