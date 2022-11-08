@@ -228,6 +228,12 @@ def init_weight(m):
 def prepare_data(args):
     print(" laoding " +args.data +" ...")
 
+    if args.random_crop_h:
+        if args.random_crop_w is None:
+            args.random_crop_w = args.random_crop_h
+        args.random_crop = (args.random_crop_h,args.random_crop_w)
+
+
     if  args.data == 'cifar':
         train_data = dset.CIFAR10(root='./data', train=True, download=True,
                                    transform=transforms.Compose([
@@ -456,13 +462,21 @@ def sample_patches_from_gen_2D(args,b_size,netG,coord_grids,device ='cpu'):
         #sample coordinate grids
         for grid in coord_grids: # grids for different resolutions 4,8, .. 
             grid = grid.unsqueeze(0).repeat(n_imgs, 1,1,1) # repeat for number of images (n_imgs,emb_dim = 4, h*res,w*res)
-            local_coord_grid = crop_fun_(grid,grid.size(2)//h,grid.size(3)//w,grid.size(2),device = device)
+            #print(grid.shape)
+            local_coord_grid = crop_fun_(grid,grid.size(2)//h,grid.size(3)//w,grid.size(2)//h,device = device) # (bs,4,res,res)
+            #print(local_coord_grid.shape)
             local_grids.append(local_coord_grid)
-        local_grids = torch.stack(local_grids)
     else:
         local_grids = None
-    
 
+    
+    #print(maps_merged.shape)
+    #print(maps.shape)
+
+    #print(grid.shape)
+    #print(local_coord_grid.shape)
+
+    #exit()
     #Make the map as an additional input to netG.
     y_G = maps
     y_D = None

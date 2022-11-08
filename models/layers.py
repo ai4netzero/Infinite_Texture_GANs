@@ -145,26 +145,26 @@ class ResBlockGenerator(nn.Module):
         self.learnable_sc = (in_channels != out_channels) or upsample
 
         # setting dim = 0 when no cooord used
-        if not args.use_coords: 
+        if not args.use_coord: 
             args.coord_emb_dim = 0
 
 
-        self.conv1 = conv3x3(in_channels+args.coord_emb_dim,hidden_channels,args.SN).apply(init_weight)
-        self.conv2 = conv3x3(hidden_channels+args.coord_emb_dim,out_channels,args.SN).apply(init_weight)
-        self.conv3 = conv1x1(in_channels+args.coord_emb_dim,out_channels,args.SN).apply(init_weight)
+        self.conv1 = conv3x3(in_channels+args.coord_emb_dim,hidden_channels,args.spec_norm_G).apply(init_weight)
+        self.conv2 = conv3x3(hidden_channels+args.coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
+        self.conv3 = conv1x1(in_channels+args.coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
         self.upsampling = nn.Upsample(scale_factor=2)
 
-        if n_classes == 0 and 'conv' not in args.cond_method:
+        if n_classes == 0 and 'conv' not in args.G_cond_method:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(hidden_channels)
             self.condnorm = False
         else:                
-            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= args.SN,cond_method=args.cond_method)
-            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=args.SN,cond_method=args.cond_method)
+            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= args.spec_norm_G,cond_method=args.G_cond_method)
+            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method)
             self.condnorm = True
 
-        if args.leak >0:
-            self.activation = nn.LeakyReLU(args.leak)
+        if args.leak_G >0:
+            self.activation = nn.LeakyReLU(args.leak_G)
         else:
             self.activation = nn.ReLU() 
 
@@ -172,7 +172,7 @@ class ResBlockGenerator(nn.Module):
         if self.learnable_sc:
             if self.upsample:
                 x = self.upsampling(x)
-            if coord:
+            if coord is not None:
                 x = torch.cat((x,coord),1)
             x = self.conv3(x)
             return x
@@ -188,7 +188,8 @@ class ResBlockGenerator(nn.Module):
         if self.upsample:
              out = self.upsampling(out)
 
-        if coord:
+        if coord is not None:
+            #print(coord.shape)
             out = torch.cat((out,coord),1)
 
         out = self.conv1(out)
@@ -197,7 +198,7 @@ class ResBlockGenerator(nn.Module):
         else:
             out = self.activation(self.bn2(out))
 
-        if coord:
+        if coord is not None:
             out = torch.cat((out,coord),1)
 
         out = self.conv2(out)

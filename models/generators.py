@@ -30,6 +30,9 @@ class Res_Generator(nn.Module):
             self.z_dim = self.z_dim+n_classes
             n_classes = 0
 
+        if args.use_coord is False:
+            self.coord_emb_dim = 0
+
         if self.leak >0:
             self.activation = nn.LeakyReLU(self.leak)
         else:
@@ -49,7 +52,8 @@ class Res_Generator(nn.Module):
         else:
             final_chin = self.base_ch
         self.bn = nn.BatchNorm2d(final_chin)
-        self.final = conv3x3(final_chin,self.img_ch,SN = SN).apply(init_weight)
+
+        self.final = conv3x3(final_chin+self.coord_emb_dim ,self.img_ch,SN = SN).apply(init_weight)
 
 
     def forward(self, z,y=None,coord_grids = None):
@@ -69,6 +73,9 @@ class Res_Generator(nn.Module):
             h = self.block5(h,y,coord_grids[4])
         h = self.bn(h)
         h = self.activation(h)
+
+        if coord_grids[-1] is not None:
+            h = torch.cat((h,coord_grids[-1]),1)
         h = self.final(h)
         return nn.Tanh()(h)
 
