@@ -137,7 +137,7 @@ class Attention(nn.Module):
     
     
 class ResBlockGenerator(nn.Module):
-    def __init__(self,args, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0):
+    def __init__(self,args, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0,coord_emb_dim = None):
         super(ResBlockGenerator, self).__init__()
         hidden_channels = out_channels if hidden_channels is None else hidden_channels
         
@@ -145,13 +145,13 @@ class ResBlockGenerator(nn.Module):
         self.learnable_sc = (in_channels != out_channels) or upsample
 
         # setting dim = 0 when no cooord used
-        #if not args.use_coord: 
-        #    args.coord_emb_dim = 0
+        if  coord_emb_dim is None:
+            coord_emb_dim = 0
 
 
-        self.conv1 = conv3x3(in_channels+args.coord_emb_dim,hidden_channels,args.spec_norm_G).apply(init_weight)
-        self.conv2 = conv3x3(hidden_channels+args.coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
-        self.conv3 = conv1x1(in_channels+args.coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
+        self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G).apply(init_weight)
+        self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
+        self.conv3 = conv1x1(in_channels+coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
         self.upsampling = nn.Upsample(scale_factor=2)
 
         if n_classes == 0 and 'conv' not in args.G_cond_method:

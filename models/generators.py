@@ -40,7 +40,7 @@ class Res_Generator(nn.Module):
         
         self.dense = Linear(self.z_dim, base_res * base_res * self.base_ch*8,SN=SN)
         
-        self.block1 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*8,upsample=True,n_classes = n_classes)
+        self.block1 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*8,upsample=True,n_classes = n_classes,coord_emb_dim = args.coord_emb_dim)
         self.block2 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*4,upsample=True,n_classes = n_classes)
         self.block3 = ResBlockGenerator(args,self.base_ch*4, self.base_ch*2,upsample=True,n_classes = n_classes)
         if self.att:
@@ -53,7 +53,7 @@ class Res_Generator(nn.Module):
             final_chin = self.base_ch
         self.bn = nn.BatchNorm2d(final_chin)
 
-        self.final = conv3x3(final_chin+self.coord_emb_dim,self.img_ch,SN = SN).apply(init_weight)
+        self.final = conv3x3(final_chin,self.img_ch,SN = SN).apply(init_weight)
 
 
     def forward(self, z,y=None,coord_grids = None):
@@ -64,18 +64,18 @@ class Res_Generator(nn.Module):
         if coord_grids is None:
             coord_grids = [coord_grids]*self.n_layers_G
         h = self.block1(h,y,coord_grids[0])
-        h = self.block2(h, y,coord_grids[1])
-        h = self.block3(h, y,coord_grids[2])
+        h = self.block2(h, y)
+        h = self.block3(h, y)
         if self.att:
             h = self.attention(h)
-        h = self.block4(h,y,coord_grids[3])
+        h = self.block4(h,y)
         if self.n_layers_G ==5:
-            h = self.block5(h,y,coord_grids[4])
+            h = self.block5(h,y)
         h = self.bn(h)
         h = self.activation(h)
 
-        if coord_grids[-1] is not None:
-            h = torch.cat((h,coord_grids[-1]),1)
+        #if coord_grids[-1] is not None:
+        #    h = torch.cat((h,coord_grids[-1]),1)
         h = self.final(h)
         return nn.Tanh()(h)
 
