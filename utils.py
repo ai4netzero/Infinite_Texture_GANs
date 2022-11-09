@@ -486,9 +486,9 @@ def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grids,device ='cpu'):
 
     #print(meta_coord_grids[0].shape)
     #print(sampled_coord_grids[0].shape)
-    #print(local_grids[0].shape)
+    #print(local_grids[1][0,0])
 
-    #print(meta_coord_grids[0][1,:,:])
+    #print(meta_coord_grids[-1][1,:,:])
 
 
     #exit()
@@ -501,15 +501,18 @@ def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grids,device ='cpu'):
 
 def random_sample_coord_grid(args,meta_grids,y_size=6, x_size= 6,n_imgs = 1):
     local_grids_res_imgs = [] 
-
+    y_st_ind = torch.randint(0,args.meta_map_h-y_size+1,(n_imgs,))
+    x_st_ind = torch.randint(0,args.meta_map_w-x_size+1,(n_imgs,))
+    #print(y_st_ind,x_st_ind)
     res = args.base_res*2 # patch res. 
     for local_grids_imgs in meta_grids: # for each resolution
         # resolution of img 
         img_y_size = res * y_size 
         img_x_size = res * x_size
-        y_st = torch.randint(0,local_grids_imgs.size(1)-img_y_size,(n_imgs,))
-        x_st = torch.randint(0,local_grids_imgs.size(2)-img_x_size,(n_imgs,))
-
+        y_st = res*y_st_ind
+        x_st = res*x_st_ind
+        
+        #print(y_st,x_st)
         grids = []
         for xx, yy in zip(x_st, y_st):
             grid = local_grids_imgs[:,  yy:yy+img_y_size,xx:xx+img_x_size] # (emb,img_y_size,img_x_size)
