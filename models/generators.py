@@ -30,8 +30,8 @@ class Res_Generator(nn.Module):
             self.z_dim = self.z_dim+n_classes
             n_classes = 0
 
-        if args.use_coord is False:
-            self.coord_emb_dim =0
+        #if args.use_coord is False:
+        #    self.coord_emb_dim =0
 
         if self.leak >0:
             self.activation = nn.LeakyReLU(self.leak)

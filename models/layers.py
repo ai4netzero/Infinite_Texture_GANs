@@ -145,8 +145,8 @@ class ResBlockGenerator(nn.Module):
         self.learnable_sc = (in_channels != out_channels) or upsample
 
         # setting dim = 0 when no cooord used
-        if not args.use_coord: 
-            args.coord_emb_dim = 0
+        #if not args.use_coord: 
+        #    args.coord_emb_dim = 0
 
 
         self.conv1 = conv3x3(in_channels+args.coord_emb_dim,hidden_channels,args.spec_norm_G).apply(init_weight)
