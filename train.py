@@ -296,6 +296,7 @@ train(epochs,disc_iters)
 if args.ema:
     torch.save({
                 'netG_state_dict': netG_ema.state_dict(),
+                'args': args,
                 }, filename+"_ema.pth")
 
         
