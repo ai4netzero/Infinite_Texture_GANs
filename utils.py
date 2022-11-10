@@ -148,9 +148,9 @@ def prepare_parser():
                         ,help ='period_coef')
     parser.add_argument('--num_neighbors',type=int, default=3
                         ,help ='num_neighbors')
-    parser.add_argument('--meta_map_h',type=int, default=30
+    parser.add_argument('--meta_grid_h',type=int, default=30
                         ,help ='height of meta map')
-    parser.add_argument('--meta_map_w',type=int, default=30
+    parser.add_argument('--meta_grid_w',type=int, default=30
                         ,help ='width of meta map')
     # GPU settings
     parser.add_argument('--ngpu', type=int, default=1
@@ -442,7 +442,7 @@ def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num
     
     return fake, y_D
 
-def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grids,device ='cpu'): 
+def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grid,device ='cpu'): 
 
     # latent z
     if args.z_dist == 'normal': 
@@ -466,19 +466,19 @@ def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grids,device ='cpu'):
 
     if args.use_coord:
          # random sample grid for each image
-        sampled_coord_grids = random_sample_coord_grid(args,meta_coord_grids,args.num_patches_h,args.num_patches_w,n_imgs)  # (#resols,n_imgs,emb_dim,h*res,w*res)
+        sampled_coord_grid = random_sample_coord_grid(args,meta_coord_grid,args.num_patches_h,args.num_patches_w,n_imgs)  # (n_imgs,emb_dim,h*res,w*res)
         
-        local_grids = []
+        #local_grids = []
         #sample coordinate grids
-        for grid in sampled_coord_grids: # grids for different resolutions 4,8, .. 
-            # use const. grid for all images ( wrong ?)
-            #grid = grid.unsqueeze(0).repeat(n_imgs, 1,1,1) # repeat for number of images (n_imgs,emb_dim = 4, h*res,w*res)
-            #print(grid.shape)
-            local_coord_grid = crop_fun_(grid,grid.size(2)//h,grid.size(3)//w,grid.size(2)//h,device = device) # (bs,4,res,res)
-            #print(local_coord_grid.shape)
-            local_grids.append(local_coord_grid)
+        #for grid in sampled_coord_grids: # grids for different resolutions 4,8, .. 
+        # use const. grid for all images ( wrong ?)
+        #grid = grid.unsqueeze(0).repeat(n_imgs, 1,1,1) # repeat for number of images (n_imgs,emb_dim = 4, h*res,w*res)
+        #print(grid.shape)
+        local_coord_grid = crop_fun_(sampled_coord_grid,args.img_res,args.img_res,args.img_res,device = device) # (bs,4,res,res)
+        #print(local_coord_grid.shape)
+        #local_grids.append(local_coord_grid)
     else:
-        local_grids = None
+        local_coord_grid = None
 
     
     #print(maps_merged.shape)
@@ -495,36 +495,35 @@ def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grids,device ='cpu'):
     #Make the map as an additional input to netG.
     y_G = maps
     y_D = None
-    fake = netG(z, y_G,local_grids)
+    fake = netG(z, y_G,local_coord_grid)
     
     return fake, y_D
 
-def random_sample_coord_grid(args,meta_grids,y_size=6, x_size= 6,n_imgs = 1):
-    local_grids_res_imgs = [] 
-    # should be sampled at res.
-    y_st_ind = torch.randint(0,args.meta_map_h-y_size+1,(n_imgs,))
-    x_st_ind = torch.randint(0,args.meta_map_w-x_size+1,(n_imgs,))
+def random_sample_coord_grid(args,meta_grid,h=6, w= 6,n_imgs = 1):
+
+    # in pixel space 
+    y_size = h*args.img_res
+    x_size = h*args.img_res
+
+    #print(meta_grid.size(1),meta_grid.size(2))
+    # should be sampled in pixel space.
+    y_st_ind = torch.randint(0,meta_grid.size(1)-y_size+1,(n_imgs,))
+    x_st_ind = torch.randint(0,meta_grid.size(2)-x_size+1,(n_imgs,))
+
     #print(y_st_ind,x_st_ind)
-    res = args.base_res*2 # patch res. at G  1st layer 
-    for local_grids_imgs in meta_grids: # for each resolution
+    #res = args.base_res*2 # patch res. at G  1st layer 
+    #for local_grids_imgs in meta_grids: # for each resolution
         # resolution of img 
-        img_y_size = res * y_size 
-        img_x_size = res * x_size
-        y_st = res*y_st_ind
-        x_st = res*x_st_ind
-        
-        #print(y_st,x_st)
-        grids = []
-        for xx, yy in zip(x_st, y_st):
-            grid = local_grids_imgs[:,  yy:yy+img_y_size,xx:xx+img_x_size] # (emb,img_y_size,img_x_size)
-            grids.append(grid)
+    #exit()
+    #print(y_st,x_st)
+    grids = []
+    for xx, yy in zip(x_st_ind, y_st_ind):
+        grid = meta_grid[:,  yy:yy+y_size,xx:xx+x_size] # (emb,img_y_size,img_x_size)
+        grids.append(grid)
 
-        grids = torch.stack(grids).contiguous().clone().detach() # (n_imgs,emb,img_y_size,img_x_size)
-        
-        local_grids_res_imgs.append(grids)
-
-        res = res*2
-    return local_grids_res_imgs # (#resol,n_imgs,emb,img_y_size,img_x_size)
+    grids = torch.stack(grids).contiguous().clone().detach() # (n_imgs,emb,img_y_size,img_x_size)
+    
+    return grids # (n_imgs,emb,img_y_size,img_x_size)
 
 
 

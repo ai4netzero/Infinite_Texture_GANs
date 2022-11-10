@@ -61,8 +61,8 @@ class Res_Generator(nn.Module):
             z = torch.cat((z,y),1)
             y = None
         h = self.dense(z).view(-1,self.base_ch*8, self.base_res, self.base_res)
-        if coord_grids is None:
-            coord_grids = [coord_grids]*self.n_layers_G
+        #if coord_grids is None:
+        #    coord_grids = [coord_grids]*self.n_layers_G
         h = self.block1(h,y)
         h = self.block2(h, y)
         h = self.block3(h, y)
@@ -74,8 +74,8 @@ class Res_Generator(nn.Module):
         h = self.bn(h)
         h = self.activation(h)
 
-        if coord_grids[-1] is not None:
-            h = torch.cat((h,coord_grids[-1]),1)
+        if coord_grids is not None:
+            h = torch.cat((h,coord_grids),1)
         h = self.final(h)
         return nn.Tanh()(h)
 

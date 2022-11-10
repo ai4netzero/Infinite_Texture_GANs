@@ -1,12 +1,13 @@
 ''' train
    This script train a generative model '''
-import os
-import sys
-import random
-import numpy as np
-import matplotlib.pyplot as plt
-import time
 import argparse
+import os
+import random
+import sys
+import time
+
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -142,14 +143,10 @@ start_time = time.time()
 
 
 if args.use_coord:
-    meta_coord_grids = []
-    # generate grid for each resolution
-    res = args.base_res*2
-    for i in range(netG.n_layers_G):
-        meta_coord_grids.append(create_coord_gird(res*args.meta_map_h,res*args.meta_map_w,coef = args.period_coef))
-        res = res *2 
+    args.img_res = (2**netG.n_layers_G) * args.base_res
+    meta_coord_grid = create_coord_gird(args.meta_grid_h* args.img_res,args.meta_grid_w* args.img_res,coef = args.period_coef)
 else:
-    meta_coord_grids = None      
+    meta_coord_grid = None      
 
 
 
@@ -206,7 +203,7 @@ def train(num_epochs=1, disc_iters=1):
                     fake_x, fake_y = sample_patches_from_gen_1D(args,G_b_size, zdim,args.zdim_b,args.num_patches_per_img, n_cl, netG,device,real_y=real_y)
                     fake_x = merge_patches_1D(fake_x,args.num_patches_per_img,device)
                 elif args.G_patch_2D:
-                    fake_x, fake_y = sample_patches_from_gen_2D(args,G_b_size, netG,meta_coord_grids,device)
+                    fake_x, fake_y = sample_patches_from_gen_2D(args,G_b_size, netG,meta_coord_grid,device)
                     fake_x = merge_patches_2D(fake_x,h = args.num_patches_h,w = args.num_patches_w,device = device)
                 else:
                     fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
@@ -232,7 +229,7 @@ def train(num_epochs=1, disc_iters=1):
                     fake_x, fake_y = sample_patches_from_gen_1D(args,G_b_size, zdim,args.zdim_b,args.num_patches_per_img, n_cl, netG,device,real_y=real_y)
                     fake_x = merge_patches_1D(fake_x,args.num_patches_per_img)
                 elif args.G_patch_2D:
-                    fake_x, fake_y = sample_patches_from_gen_2D(args,G_b_size, netG,meta_coord_grids,device)
+                    fake_x, fake_y = sample_patches_from_gen_2D(args,G_b_size, netG,meta_coord_grid,device)
                     fake_x = merge_patches_2D(fake_x,h = args.num_patches_h,w = args.num_patches_w,device = device)
                 else:
                     fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
