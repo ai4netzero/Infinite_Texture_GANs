@@ -504,7 +504,7 @@ def random_sample_coord_grid(args,meta_grids,y_size=6, x_size= 6,n_imgs = 1):
     y_st_ind = torch.randint(0,args.meta_map_h-y_size+1,(n_imgs,))
     x_st_ind = torch.randint(0,args.meta_map_w-x_size+1,(n_imgs,))
     #print(y_st_ind,x_st_ind)
-    res = args.base_res*2 # patch res. 
+    res = args.base_res*2 # patch res. at G  1st layer 
     for local_grids_imgs in meta_grids: # for each resolution
         # resolution of img 
         img_y_size = res * y_size 
