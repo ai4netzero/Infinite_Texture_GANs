@@ -501,9 +501,10 @@ def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grids,device ='cpu'):
 
 def random_sample_coord_grid(args,meta_grids,y_size=6, x_size= 6,n_imgs = 1):
     local_grids_res_imgs = [] 
+    # should be sampled at res.
     y_st_ind = torch.randint(0,args.meta_map_h-y_size+1,(n_imgs,))
     x_st_ind = torch.randint(0,args.meta_map_w-x_size+1,(n_imgs,))
-    print(y_st_ind,x_st_ind)
+    #print(y_st_ind,x_st_ind)
     res = args.base_res*2 # patch res. at G  1st layer 
     for local_grids_imgs in meta_grids: # for each resolution
         # resolution of img 
