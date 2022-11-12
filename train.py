@@ -63,10 +63,10 @@ dataloader,train_data = prepare_data(args)
 print('Training samples: ',len(train_data))
 
 # conditional GAN
-if cgan:
-    n_cl = args.n_cl
-else:
-    n_cl = 0
+#if cgan:
+n_cl = args.n_cl
+#else:
+#    n_cl = 0
 
 
 #models
@@ -171,8 +171,8 @@ def train(num_epochs=1, disc_iters=1):
         for i, data in enumerate(dataloader, 0):
             #print(i)
             real_x = data[0].to(device)
-            # label 
-            if n_cl > 0:
+            # load labels if using cgan 
+            if args.cgan:
                 real_y = data[1].float().to(device) # discrete 0,1,...n_cl-1
                 if args.ohe: # convert discrete values to ohe
                     real_y = disc_2_ohe(real_y.long(),n_cl,device)

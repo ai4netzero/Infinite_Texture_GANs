@@ -69,19 +69,19 @@ class ConditionalNorm(nn.Module):
         else:
             out_channels = in_channel*2
             
-        if self.cond_method == 'conv1x1':
+        if self.cond_method == 'conv1x1': # SPADE
             self.mlp_shared = nn.Sequential(
-            conv1x1(1, 128,bias = True,SN=SN),
+            conv1x1(n_condition, 128,bias = True,SN=SN),
             nn.ReLU()
             )
             self.embed = conv1x1(128, out_channels,bias = True,SN=SN)
-        elif self.cond_method == 'conv3x3':
+        elif self.cond_method == 'conv3x3': # SPADE 
             self.mlp_shared = nn.Sequential(
-            conv3x3(1, 128,bias = True,SN=SN),
+            conv3x3(n_condition, 128,bias = True,SN=SN),
             nn.ReLU()
             )
             self.embed = conv3x3(128, out_channels,bias = True,SN=SN)
-        else:
+        else: # CBN
             self.embed = Linear(n_condition, out_channels,bias = True,SN=SN)
 
         if self.cond_method == 'cbn_fix_scale':
@@ -98,7 +98,7 @@ class ConditionalNorm(nn.Module):
             gamma = gamma.unsqueeze(2).unsqueeze(3)
             beta = beta.unsqueeze(2).unsqueeze(3)
         elif 'conv' in self.cond_method:
-            label = label.view(-1,1,label.size(-2),label.size(-1))
+            label = label.view(-1,self.n_condition,label.size(-2),label.size(-1))
             label = nn.Upsample(size= inputs.size(-1),mode = 'bilinear')(label)
             actv  = self.mlp_shared(label.float())
             embed = self.embed(actv)
@@ -154,7 +154,7 @@ class ResBlockGenerator(nn.Module):
         self.conv3 = conv1x1(in_channels+coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
         self.upsampling = nn.Upsample(scale_factor=2)
 
-        if n_classes == 0 and 'conv' not in args.G_cond_method:
+        if n_classes == 0 : #and 'conv' not in args.G_cond_method:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(hidden_channels)
             self.condnorm = False

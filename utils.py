@@ -192,11 +192,12 @@ def prepare_parser():
 def prepare_device(args):
     # Device
     ngpu = args.ngpu
+    print("Device: ",args.dev_num)
+
     if ngpu==1:
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args.dev_num)
     device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
-    print("Device: ",device)
     return device
 
 def prepare_seed(args):
@@ -457,10 +458,10 @@ def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grid,device ='cpu'):
     n_imgs = b_size//num_patches_per_img
 
     # Generate global stochastic map for each image. (+2 is added for padding: two rows and two columns)
-    maps_merged =  torch.randn(n_imgs,1,(h+2)* args.m_dim,(w+2)*args.m_dim)#.numpy() # (n_imgs,1,H,W)
+    maps_merged =  torch.randn(n_imgs,args.n_cl,(h+2)* args.m_dim,(w+2)*args.m_dim)#.numpy() # (n_imgs,ch,H,W)
 
     # Crop the large map into smaller map for each image patch. The cropping size is 3x3, i.e., 8 surrounding patches.
-    maps = crop_fun_(maps_merged,args.num_neighbors*args.m_dim,args.num_neighbors*args.m_dim,args.m_dim,device = device) #(bs,1,3*m_dim,3*m_dim)
+    maps = crop_fun_(maps_merged,args.num_neighbors*args.m_dim,args.num_neighbors*args.m_dim,args.m_dim,device = device) #(bs,ch,3*m_dim,3*m_dim)
     
    
 
