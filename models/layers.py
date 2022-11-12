@@ -151,7 +151,7 @@ class ResBlockGenerator(nn.Module):
 
         self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G).apply(init_weight)
         self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
-        self.conv3 = conv1x1(in_channels+coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
+        self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
         self.upsampling = nn.Upsample(scale_factor=2)
 
         if n_classes == 0 : #and 'conv' not in args.G_cond_method:
@@ -172,8 +172,8 @@ class ResBlockGenerator(nn.Module):
         if self.learnable_sc:
             if self.upsample:
                 x = self.upsampling(x)
-            if coord is not None:
-                x = torch.cat((x,coord),1)
+            #if coord is not None:
+            #    x = torch.cat((x,coord),1)
             x = self.conv3(x)
             return x
         else:

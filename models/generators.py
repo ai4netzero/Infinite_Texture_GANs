@@ -50,7 +50,7 @@ class Res_Generator(nn.Module):
         self.block4 = ResBlockGenerator(args,self.base_ch*2, self.base_ch,upsample=True,n_classes = n_classes)
         if n_layers_G==5:
             final_chin = self.base_ch//2
-            self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,upsample=True,n_classes = n_classes)
+            self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,upsample=True,n_classes = n_classes,coord_emb_dim = self.coord_emb_dim)
         else:
             final_chin = self.base_ch
         self.bn = nn.BatchNorm2d(final_chin)
@@ -72,7 +72,7 @@ class Res_Generator(nn.Module):
             h = self.attention(h)
         h = self.block4(h,y)
         if self.n_layers_G ==5:
-            h = self.block5(h,y)
+            h = self.block5(h,y,coord_grids)
         h = self.bn(h)
         h = self.activation(h)
 
