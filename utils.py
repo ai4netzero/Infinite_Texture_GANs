@@ -652,10 +652,10 @@ def crop_fun_(img,cropping_size = 256,stride = 256,device='cpu'): # for a mini-b
 
     return batch_patches.to(device=device)'''
 
-def crop_fun(img,cropping_size_h = 256,cropping_size_w=256,stride = 256):
+def crop_fun(img,cropping_size_h = 256,cropping_size_w=256,stride = 256,device = 'cpu'):
     img_h = img.shape[1]
     img_w=  img.shape[2]
-    crops = torch.tensor([])
+    crops = torch.tensor([]).to(device)
 
     start_h = 0
     end_h = cropping_size_h
@@ -682,7 +682,7 @@ def crop_fun_(img,cropping_size_h = 256,cropping_size_w=256,stride = 256,device=
     batch_patches = torch.tensor([])
     for l in range(N):
         #print(l)
-        crops =  crop_fun(img[l,:,:,:],cropping_size_h = cropping_size_h,cropping_size_w=cropping_size_w,stride = stride)
+        crops =  crop_fun(img[l,:,:,:],cropping_size_h = cropping_size_h,cropping_size_w=cropping_size_w,stride = stride,device=device)
         batch_patches = torch.cat((batch_patches,crops),0)
 
     return batch_patches.to(device=device)
