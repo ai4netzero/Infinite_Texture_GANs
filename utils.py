@@ -679,13 +679,13 @@ def crop_fun(img,cropping_size_h = 256,cropping_size_w=256,stride = 256,device =
 def crop_fun_(img,cropping_size_h = 256,cropping_size_w=256,stride = 256,device='cpu'): # for a mini-batch
     img = img.clone()
     N = img.shape[0] # images in batch
-    batch_patches = torch.tensor([])
+    batch_patches = torch.tensor([]).to(device)
     for l in range(N):
         #print(l)
         crops =  crop_fun(img[l,:,:,:],cropping_size_h = cropping_size_h,cropping_size_w=cropping_size_w,stride = stride,device=device)
         batch_patches = torch.cat((batch_patches,crops),0)
 
-    return batch_patches.to(device=device)
+    return batch_patches#.to(device=device)
 
 
 def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init=None, coef=1):
