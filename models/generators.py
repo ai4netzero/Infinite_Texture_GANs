@@ -53,7 +53,7 @@ class Res_Generator(nn.Module):
             self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,upsample=True,n_classes = n_classes,coord_emb_dim = self.coord_emb_dim)
         else:
             final_chin = self.base_ch
-        self.bn = nn.BatchNorm2d(final_chin)
+        #self.bn = nn.BatchNorm2d(final_chin)
 
         self.final = conv3x3(final_chin+self.coord_emb_dim,self.img_ch,SN = SN).apply(init_weight)
 
@@ -73,7 +73,7 @@ class Res_Generator(nn.Module):
         h = self.block4(h,y)
         if self.n_layers_G ==5:
             h = self.block5(h,y,coord_grids)
-        h = self.bn(h)
+        #h = self.bn(h)
         h = self.activation(h)
 
         if coord_grids is not None:
