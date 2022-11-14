@@ -99,7 +99,7 @@ class ConditionalNorm(nn.Module):
             beta = beta.unsqueeze(2).unsqueeze(3)
         elif 'conv' in self.cond_method:
             label = label.view(-1,self.n_condition,label.size(-2),label.size(-1))
-            label = nn.Upsample(size= inputs.size(-1),mode = 'bilinear')(label)
+            label = nn.Upsample(size= inputs.size(-1))(label)
             actv  = self.mlp_shared(label.float())
             embed = self.embed(actv)
             gamma, beta = embed.chunk(2, dim=1)
