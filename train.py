@@ -17,7 +17,7 @@ from tqdm import tqdm_notebook as tqdm
 
 from utils import *
 
-torch.set_num_threads(16) 
+#torch.set_num_threads(16) 
 
 # configurations
 parser = prepare_parser()
