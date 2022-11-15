@@ -99,7 +99,8 @@ class ConditionalNorm(nn.Module):
             beta = beta.unsqueeze(2).unsqueeze(3)
         elif 'conv' in self.cond_method:
             label = label.view(-1,self.n_condition,label.size(-2),label.size(-1))
-            label = nn.Upsample(size= inputs.size(-1))(label)
+            label = F.interpolate(label, size=inputs.size()[2:], mode='nearest')
+            #label = nn.Upsample(size= inputs.size(-1))(label)
             actv  = self.mlp_shared(label.float())
             embed = self.embed(actv)
             gamma, beta = embed.chunk(2, dim=1)
@@ -141,8 +142,8 @@ class ResBlockGenerator(nn.Module):
         super(ResBlockGenerator, self).__init__()
         hidden_channels = out_channels if hidden_channels is None else hidden_channels
         
-        self.upsample = upsample
-        self.learnable_sc = (in_channels != out_channels) or upsample
+        #self.upsample = upsample
+        self.learnable_sc = (in_channels != out_channels) #or upsample
 
         # setting dim = 0 when no cooord used
         if  coord_emb_dim is None:
@@ -152,7 +153,7 @@ class ResBlockGenerator(nn.Module):
         self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G).apply(init_weight)
         self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
         self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
-        self.upsampling = nn.Upsample(scale_factor=2)
+        #self.upsampling = nn.Upsample(scale_factor=2)
 
         if n_classes == 0 : #and 'conv' not in args.G_cond_method:
             self.bn1 = nn.BatchNorm2d(in_channels)
@@ -170,12 +171,16 @@ class ResBlockGenerator(nn.Module):
         else:
             self.activation = nn.ReLU() 
 
-    def shortcut(self, x,coord=None):
+    def shortcut(self, x,y=None,coord=None):
         if self.learnable_sc:
-            if self.upsample:
-                x = self.upsampling(x)
+            #if self.upsample:
+            #    x = self.upsampling(x)
             #if coord is not None:
             #    x = torch.cat((x,coord),1)
+            if self.condnorm >0:
+                x = self.bn3(x,y)
+            #else:
+            #    out = self.activation(self.bn1(x))
             x = self.conv3(x)
             return x
         else:
@@ -187,8 +192,8 @@ class ResBlockGenerator(nn.Module):
         else:
             out = self.activation(self.bn1(x))
 
-        if self.upsample:
-             out = self.upsampling(out)
+        #if self.upsample:
+        #     out = self.upsampling(out)
 
         if coord is not None:
             #print(coord.shape)
@@ -204,7 +209,7 @@ class ResBlockGenerator(nn.Module):
             out = torch.cat((out,coord),1)
 
         out = self.conv2(out)
-        out_res = self.shortcut(x,coord)
+        out_res = self.shortcut(x,y,coord)
         return out + out_res
 
 class ResBlockDiscriminator(nn.Module):
