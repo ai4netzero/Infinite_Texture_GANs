@@ -26,6 +26,8 @@ class Res_Generator(nn.Module):
         self.SN =SN =  args.spec_norm_G
         #
 
+        self.up = nn.Upsample(scale_factor=2)
+
         if self.cond_method == 'concat':
             self.z_dim = self.z_dim+n_classes
             n_classes = 0
@@ -66,10 +68,12 @@ class Res_Generator(nn.Module):
         #if coord_grids is None:
         #    coord_grids = [coord_grids]*self.n_layers_G
         h = self.block1(h,y)
+        h = self.up(h)
         h = self.block2(h, y)
+        h = self.up(h)
         h = self.block3(h, y)
-        if self.att:
-            h = self.attention(h)
+        #if self.att:
+        #    h = self.attention(h)
         h = self.block4(h,y)
         if self.n_layers_G ==5:
             h = self.block5(h,y,coord_grids)

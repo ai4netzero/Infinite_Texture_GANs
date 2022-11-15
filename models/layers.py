@@ -161,6 +161,8 @@ class ResBlockGenerator(nn.Module):
         else:                
             self.bn1 = ConditionalNorm(in_channels,n_classes,SN= args.spec_norm_G,cond_method=args.G_cond_method)
             self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method)
+            self.bn3 = ConditionalNorm(in_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method)
+
             self.condnorm = True
 
         if args.leak_G >0:
