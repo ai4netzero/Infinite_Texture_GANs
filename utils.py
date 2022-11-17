@@ -273,7 +273,7 @@ def prepare_data(args):
 
     dataloader = torch.utils.data.DataLoader(train_data,
                        shuffle=True, batch_size=args.batch_size,
-                       num_workers=4)
+                       num_workers=1)
 
     print("Finished data loading")    
     return dataloader,train_data
