@@ -165,6 +165,8 @@ def prepare_parser():
                         ,help = 'number of gpus to be used')                                     
     parser.add_argument('--dev_num', type=int, default=0
                         ,help = 'the index of a gpu to be used if --ngpu is 1 ')
+    parser.add_argument('--gpu_list', nargs='+', default=None,type=int
+                        ,help='list of devices to used in parallizatation if ngpu > 1')
                         
     # folder name             
     parser.add_argument('--fname', type=str, default='models_cp',help='folder name to save cp')
