@@ -24,9 +24,11 @@ class Res_Generator(nn.Module):
         self.img_ch = args.img_ch
         self.leak = leak =  args.leak_G
         self.SN =SN =  args.spec_norm_G
+        self.padding_mode = args.G_padding
+        self.upsampling_mode = args.G_upsampling
         #
 
-        self.up = nn.Upsample(scale_factor=2)
+        self.up = nn.Upsample(scale_factor=2,mode = args.G_upsampling)
 
         if self.cond_method == 'concat':
             self.z_dim = self.z_dim+n_classes
@@ -60,8 +62,9 @@ class Res_Generator(nn.Module):
             final_chin = self.base_ch
         #self.bn = nn.BatchNorm2d(final_chin)
 
-        self.final = conv3x3(final_chin+self.coord_emb_dim,self.img_ch,SN = SN).apply(init_weight)
-
+        self.final = conv3x3(final_chin+self.coord_emb_dim,self.img_ch,SN = SN,padding_mode=self.padding_mode).apply(init_weight)
+        
+    
 
     def forward(self, z,y=None,coord_grids = None):
         if self.cond_method =='concat':

@@ -84,6 +84,11 @@ def prepare_parser():
                        ,help = 'normalization layer in patchGAN')
     parser.add_argument('--base_res', type=int, default=4
                        ,help = 'base resolution for G') 
+    parser.add_argument('--G_padding', type=str, default='zeros'
+                       ,help = 'padding used in G')
+    parser.add_argument('--G_upsampling', type=str, default='nearest'
+                       ,help = 'upsampling mode used in G')
+    
 
     # optimizers settings
     parser.add_argument('--lr_G', type=float, default=2e-4

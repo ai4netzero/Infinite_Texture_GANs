@@ -7,11 +7,11 @@ import torch.nn.functional as F
 from utils import *
 
 
-def conv3x3(ch_in,ch_out,SN = False,s = 1,p=1,bias = True):
+def conv3x3(ch_in,ch_out,SN = False,s = 1,p=1,bias = True,padding_mode='zeros'):
     if SN:
-        return SpectralNorm(nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=p, stride=s,bias = bias))
+        return SpectralNorm(nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=p, stride=s,bias = bias,padding_mode =padding_mode))
     else:
-        return nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=p,stride=s,bias = bias)
+        return nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=p,stride=s,bias = bias,padding_mode =padding_mode)
 
 def Linear(ch_in,ch_out,SN = False,bias = True):
     if SN:
@@ -144,14 +144,14 @@ class ResBlockGenerator(nn.Module):
         
         #self.upsample = upsample
         self.learnable_sc = (in_channels != out_channels) #or upsample
+        self.padding_mode = args.G_padding
 
         # setting dim = 0 when no cooord used
         if  coord_emb_dim is None:
             coord_emb_dim = 0
 
-
-        self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G).apply(init_weight)
-        self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
+        self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G,padding_mode=self.padding_mode).apply(init_weight)
+        self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G,padding_mode=self.padding_mode).apply(init_weight)
         if self.learnable_sc:
             self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
         #self.upsampling = nn.Upsample(scale_factor=2)
@@ -175,14 +175,8 @@ class ResBlockGenerator(nn.Module):
 
     def shortcut(self, x,y=None,coord=None):
         if self.learnable_sc:
-            #if self.upsample:
-            #    x = self.upsampling(x)
-            #if coord is not None:
-            #    x = torch.cat((x,coord),1)
             if self.condnorm >0:
                 x = self.bn3(x,y)
-            #else:
-            #    out = self.activation(self.bn1(x))
             x = self.conv3(x)
             return x
         else:
