@@ -32,9 +32,42 @@ n_images= args.num_imgs
 
 
 netG = prepare_models(args,n_cl,device,only_G = True)
-
-print(args.c_list)
    
+def save_images(args,netG,device,out_path):
+    n_images= args.num_imgs
+    truncated=args.truncated
+
+    if not os.path.exists(out_path):
+        os.mkdir(out_path)
+        
+    im_batch_size = 50
+    
+    if n_images<im_batch_size:
+        im_batch_size = n_images
+        
+    n_batches = n_images//im_batch_size
+        
+    for i_batch in range(0, n_images, im_batch_size):
+        if i_batch ==  n_batches*im_batch_size:
+            im_batch_size = n_images - i_batch
+            
+        gen_images,_ = sample_from_gen(args,im_batch_size,args.zdim,args.n_cl,netG,device,truncated = args.truncated)
+        gen_images = gen_images.cpu().detach()
+        #shape=(*,ch=3,h,w), torch.Tensor
+        
+        #denormalize
+        gen_images = gen_images*0.5 + 0.5
+        
+        if args.gray2rgb:
+            for i_image in range(gen_images.size(0)):
+                save_image(gen_images[i_image, :, :, :],
+                           os.path.join(out_path,args.img_name+ f'image_{i_batch+i_image:05d}.png'))
+        else:
+            for i_image in range(gen_images.size(0)):
+                x_pil = transforms.ToPILImage()(gen_images[i_image, :, :, :])
+                x_pil.save(os.path.join(out_path,args.img_name+ f'image_{i_batch+i_image:05d}.png'))
+                
+                
 if args.many is None:  # generate images for a single checkpoint args.G_cp of the model 
     netG = load_netG(netG,args.G_cp)
     if args.figure == 'grid':
@@ -53,4 +86,3 @@ else: # generate images for each checkpoint saved in the path args.many
             save_grid(args,netG,device,nrows=args.grid_rows,ncol=args.grid_rows,out_path = args.many+"/"+args.out_path+"/"+ checkname)
         else:
             save_images(args,netG,device,os.path.splitext(args.many+"/"+args.out_path+"/"+checkname)[0])
-
