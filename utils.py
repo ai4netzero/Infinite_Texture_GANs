@@ -233,8 +233,12 @@ def prepare_device(args):
     if ngpu==1:
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args.dev_num)
-    device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
+        device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
+    else:
+        device = torch.device("cuda:"+str(args.dev_num)) 
     return device
+
+
 
 def prepare_seed(args):
     #Seeds
