@@ -197,6 +197,32 @@ def prepare_parser():
 
     return parser
 
+# these arguments apply only when running sample.py file to generate images.                        
+def add_sample_parser(parser):
+                        
+    # paths                    
+    parser.add_argument('--G_cp', type=str, default=None
+                        ,help='path of generator checkpoint .pth file ')
+    parser.add_argument('--out_path', type=str, default='out'
+                       ,help = 'path to save images')
+    parser.add_argument('--many', type=str, default=None
+                        ,help='dir of the folder that contains .pth files to generate from multiple checkpoints')                 
+    parser.add_argument('--truncated', type=float, default=0
+                        ,help = 'if greater than 0 it will apply a truncation to normal dist. with --truncated value')
+    parser.add_argument('--num_imgs', type=int, default=1000
+                       , help = 'number of images to be generated')
+    parser.add_argument('--img_name', type=str, default=''
+                       ,help = 'append a string to the generate images numbers')
+                                          
+    # Genertared images configuration                    
+    parser.add_argument('--figure', type=str, default='grid'
+                        ,help='grid to save a grid of generated images or images to save them in --out_path')
+    parser.add_argument('--grid_rows', type=int, default=3
+                        ,help='num of rows in the grid')
+    parser.add_argument('--gray2rgb', default=True,action='store_false'
+                        ,help='If True save single-channel images as 3 channels')
+    return parser
+
 
 
 def prepare_device(args):
@@ -566,14 +592,21 @@ def merge_patches_2D(patches,h=3,w=3,device = 'cpu'):
     return imgs.to(device=device)
             
 
-def load_netG(netG,checkpointname = None):
+def load_netG(netG,checkpointname = None,add_module=False):
     checkpoint = torch.load(checkpointname)
     state_dict_G = checkpoint['netG_state_dict']    
     new_state_dict_G = OrderedDict()
-    for k, v in state_dict_G.items():
-        if 'module' in k:
-            k = k.replace('module.','')
-        new_state_dict_G[k] = v
+    if add_module:
+        for k, v in state_dict_G.items():
+            #if 'module' in k:
+            #    k = k.replace('module.','')
+            k = 'module.'+k
+            new_state_dict_G[k] = v
+    else:
+        for k, v in state_dict_G.items():
+            if 'module' in k:
+                k = k.replace('module.','')
+            new_state_dict_G[k] = v
     netG.load_state_dict(new_state_dict_G)
     netG.eval()
 
