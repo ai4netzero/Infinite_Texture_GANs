@@ -90,6 +90,8 @@ def prepare_parser():
                        ,help = 'upsampling mode used in G')
     parser.add_argument('--spade_upsampling', type=str, default='nearest'
                        ,help = 'type of upsampling mode used in spade')
+    parser.add_argument('--type_norm', type=str, default='bn'
+                       ,help = 'type_norm used in G')
 
     # optimizers settings
     parser.add_argument('--lr_G', type=float, default=2e-4

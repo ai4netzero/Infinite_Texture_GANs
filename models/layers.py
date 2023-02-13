@@ -52,12 +52,17 @@ def init_weight(m):
         
         
 class ConditionalNorm(nn.Module):
-    def __init__(self,args, in_channel, n_condition,SN=False,cond_method='cbn'):
+    def __init__(self, args,in_channel, n_condition,SN=False,cond_method='cbn',type_norm = 'bn'):
         super().__init__()
         self.n_condition = n_condition # number of classes
         self.cond_method = cond_method
         self.in_channel = in_channel
         self.spade_upsampling = args.spade_upsampling
+        
+        self.num_patches_h= args.num_patches_h
+        self.num_patches_w = args.num_patches_w 
+        #self.start_vector = start_vector
+        self.type_norm = type_norm
         #self.fix_scale = fix_scale # whether to fix the scalling param for all conditions or not.
 
 
@@ -69,6 +74,19 @@ class ConditionalNorm(nn.Module):
             nn.init.orthogonal_(self.embed_gamma.data, gain=1)
         else:
             out_channels = in_channel*2
+            self.out_channels = out_channels
+            
+        #if start_vector:
+        #    out_channels = in_channel
+            #print(out_channels)
+            #exit()
+        #else:
+        if type_norm == 'bn':
+            self.bn = nn.BatchNorm2d(in_channel, affine=False)  # no learning parameters
+        elif type_norm == 'inst':
+            self.bn = nn.InstanceNorm2d(in_channel, affine=False)  # no learning parameters
+
+
             
         if self.cond_method == 'conv1x1': # SPADE
             self.mlp_shared = nn.Sequential(
@@ -146,6 +164,7 @@ class ResBlockGenerator(nn.Module):
         #self.upsample = upsample
         self.learnable_sc = (in_channels != out_channels) #or upsample
         self.padding_mode = args.G_padding
+        self.type_norm = args.type_norm
 
         # setting dim = 0 when no cooord used
         if  coord_emb_dim is None:
@@ -162,10 +181,10 @@ class ResBlockGenerator(nn.Module):
             self.bn2 = nn.BatchNorm2d(hidden_channels)
             self.condnorm = False
         else:                
-            self.bn1 = ConditionalNorm(args,in_channels,n_classes,SN= args.spec_norm_G,cond_method=args.G_cond_method)
-            self.bn2 = ConditionalNorm(args,hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method)
+            self.bn1 = ConditionalNorm(args,in_channels,n_classes,SN= args.spec_norm_G,cond_method=args.G_cond_method,type_norm = self.type_norm)
+            self.bn2 = ConditionalNorm(args,hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method,type_norm = self.type_norm)
             if self.learnable_sc:
-                self.bn3 = ConditionalNorm(args,in_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method)
+                self.bn3 = ConditionalNorm(args,in_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method,type_norm = self.type_norm)
 
             self.condnorm = True
 
