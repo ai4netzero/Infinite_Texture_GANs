@@ -483,7 +483,7 @@ def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num
     
     return fake, y_D
 
-def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grid,device ='cpu'): 
+def sample_patches_from_gen_2D(args,b_size,netG,device ='cpu'): 
 
     # latent z
     if args.z_dist == 'normal': 
@@ -505,38 +505,9 @@ def sample_patches_from_gen_2D(args,b_size,netG,meta_coord_grid,device ='cpu'):
     
    
 
-    if args.use_coord:
-         # random sample grid for each image
-        sampled_coord_grid = random_sample_coord_grid(args,meta_coord_grid,args.num_patches_h,args.num_patches_w,n_imgs).to(device)  # (n_imgs,emb_dim,h*res,w*res)
-        
-        #local_grids = []
-        #sample coordinate grids
-        #for grid in sampled_coord_grids: # grids for different resolutions 4,8, .. 
-        # use const. grid for all images ( wrong ?)
-        #grid = grid.unsqueeze(0).repeat(n_imgs, 1,1,1) # repeat for number of images (n_imgs,emb_dim = 4, h*res,w*res)
-        #print(grid.shape)
-        local_coord_grid = crop_fun_(sampled_coord_grid,args.img_res,args.img_res,args.img_res,device = device) # (bs,4,res,res)
-        #print(local_coord_grid.shape)
-        #local_grids.append(local_coord_grid)
-    else:
-        local_coord_grid = None
-
-    
-    #print(maps_merged.shape)
-    #print(maps.shape)
-
-    #print(meta_coord_grids[0].shape)
-    #print(sampled_coord_grids[0].shape)
-    #print(local_grids[1][0,0])
-
-    #print(meta_coord_grids[-1][1,:,:])
-
-
-    #exit()
-    #Make the map as an additional input to netG.
     y_G = maps
     y_D = None
-    fake = netG(z, y_G,local_coord_grid)
+    fake = netG(z, y_G)
     
     return fake, y_D
 

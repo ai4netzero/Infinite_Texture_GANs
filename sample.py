@@ -69,7 +69,7 @@ def save_images(args,netG,device,out_path):
         #print(b_size)
             
         #gen_images,_ = sample_from_gen(args,im_batch_size,args.zdim,args.n_cl,netG,device,truncated = args.truncated)
-        fake,_ = sample_patches_from_gen_2D(args_model,b_size,netG,None,device)
+        fake,_ = sample_patches_from_gen_2D(args_model,b_size,netG,device)
         img_patches = fake.cpu()
         imgs_merged = merge_patches_2D(img_patches,h,w,'cpu')
         imgs_merged = imgs_merged*0.5+0.5

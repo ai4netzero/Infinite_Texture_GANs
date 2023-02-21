@@ -34,11 +34,6 @@ class Res_Generator(nn.Module):
             self.z_dim = self.z_dim+n_classes
             n_classes = 0
 
-        if args.use_coord is False:
-            self.coord_emb_dim =0
-        else:
-            self.coord_emb_dim = args.coord_emb_dim
-
         if self.leak >0:
             self.activation = nn.LeakyReLU(self.leak)
         else:
@@ -54,19 +49,19 @@ class Res_Generator(nn.Module):
         self.block4 = ResBlockGenerator(args,self.base_ch*2, self.base_ch,upsample=True,n_classes = n_classes)
         if n_layers_G>=5:
             final_chin = self.base_ch//2
-            self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,upsample=True,n_classes = n_classes,coord_emb_dim = self.coord_emb_dim)
+            self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,upsample=True,n_classes = n_classes)
             if n_layers_G == 6:
                 final_chin = self.base_ch//4
-                self.block6 = ResBlockGenerator(args,self.base_ch//2, self.base_ch//4,upsample=True,n_classes = n_classes,coord_emb_dim = self.coord_emb_dim)
+                self.block6 = ResBlockGenerator(args,self.base_ch//2, self.base_ch//4,upsample=True,n_classes = n_classes)
         else:
             final_chin = self.base_ch
         #self.bn = nn.BatchNorm2d(final_chin)
 
-        self.final = conv3x3(final_chin+self.coord_emb_dim,self.img_ch,SN = SN,padding_mode=self.padding_mode).apply(init_weight)
+        self.final = conv3x3(final_chin,self.img_ch,SN = SN,padding_mode=self.padding_mode).apply(init_weight)
         
     
 
-    def forward(self, z,y=None,coord_grids = None):
+    def forward(self, z,y=None):
         if self.cond_method =='concat':
             z = torch.cat((z,y),1)
             y = None
@@ -84,15 +79,12 @@ class Res_Generator(nn.Module):
         h = self.block4(h,y)
         if self.n_layers_G >=5:
             h = self.up(h) # 64x64
-            h = self.block5(h,y,coord_grids)
+            h = self.block5(h,y)
         if self.n_layers_G == 6:
             h = self.up(h) # 128x128
-            h = self.block6(h,y,coord_grids)
+            h = self.block6(h,y)
         #h = self.bn(h)
         h = self.activation(h)
-
-        if coord_grids is not None:
-            h = torch.cat((h,coord_grids),1)
         h = self.final(h)
         return nn.Tanh()(h)
 
