@@ -9,15 +9,15 @@ from utils import *
 
 def conv3x3(ch_in,ch_out,SN = False,s = 1,p=1,bias = True):
     if SN:
-        return SpectralNorm(nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=1, stride=s,bias = bias))
+        return SpectralNorm(nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=p, stride=s,bias = bias))
     else:
-        return nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=1,stride=s,bias = bias)
+        return nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=p,stride=s,bias = bias)
 
 def Linear(ch_in,ch_out,SN = False,bias = True):
     if SN:
-        return SpectralNorm(nn.Linear(ch_in,ch_out).apply(init_weight))
+        return SpectralNorm(nn.Linear(ch_in,ch_out,bias = bias).apply(init_weight))
     else:
-        return nn.Linear(ch_in,ch_out).apply(init_weight)
+        return nn.Linear(ch_in,ch_out,bias = bias).apply(init_weight)
 
 def conv4x4(ch_in,ch_out,SN = False,s = 2,p=1,bias = True):
     if SN:
@@ -152,7 +152,8 @@ class ResBlockGenerator(nn.Module):
 
         self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G).apply(init_weight)
         self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G).apply(init_weight)
-        self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
+        if self.learnable_sc:
+            self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
         #self.upsampling = nn.Upsample(scale_factor=2)
 
         if n_classes == 0 : #and 'conv' not in args.G_cond_method:
