@@ -88,7 +88,8 @@ def prepare_parser():
                        ,help = 'padding used in G')
     parser.add_argument('--G_upsampling', type=str, default='nearest'
                        ,help = 'upsampling mode used in G')
-    
+    parser.add_argument('--spade_upsampling', type=str, default='nearest'
+                       ,help = 'type of upsampling mode used in spade')
 
     # optimizers settings
     parser.add_argument('--lr_G', type=float, default=2e-4

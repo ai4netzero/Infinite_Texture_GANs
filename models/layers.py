@@ -52,11 +52,12 @@ def init_weight(m):
         
         
 class ConditionalNorm(nn.Module):
-    def __init__(self, in_channel, n_condition,SN=False,cond_method='cbn'):
+    def __init__(self,args, in_channel, n_condition,SN=False,cond_method='cbn'):
         super().__init__()
         self.n_condition = n_condition # number of classes
         self.cond_method = cond_method
         self.in_channel = in_channel
+        self.spade_upsampling = args.spade_upsampling
         #self.fix_scale = fix_scale # whether to fix the scalling param for all conditions or not.
 
 
@@ -99,7 +100,7 @@ class ConditionalNorm(nn.Module):
             beta = beta.unsqueeze(2).unsqueeze(3)
         elif 'conv' in self.cond_method:
             label = label.view(-1,self.n_condition,label.size(-2),label.size(-1))
-            label = F.interpolate(label, size=inputs.size()[2:], mode='nearest')
+            label = F.interpolate(label, size=inputs.size()[2:], mode=self.spade_upsampling)
             #label = nn.Upsample(size= inputs.size(-1))(label)
             actv  = self.mlp_shared(label.float())
             embed = self.embed(actv)
@@ -161,10 +162,10 @@ class ResBlockGenerator(nn.Module):
             self.bn2 = nn.BatchNorm2d(hidden_channels)
             self.condnorm = False
         else:                
-            self.bn1 = ConditionalNorm(in_channels,n_classes,SN= args.spec_norm_G,cond_method=args.G_cond_method)
-            self.bn2 = ConditionalNorm(hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method)
+            self.bn1 = ConditionalNorm(args,in_channels,n_classes,SN= args.spec_norm_G,cond_method=args.G_cond_method)
+            self.bn2 = ConditionalNorm(args,hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method)
             if self.learnable_sc:
-                self.bn3 = ConditionalNorm(in_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method)
+                self.bn3 = ConditionalNorm(args,in_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method)
 
             self.condnorm = True
 
