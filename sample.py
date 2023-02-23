@@ -51,7 +51,7 @@ def save_images(args,netG,device,out_path):
     if not os.path.exists(out_path):
         os.mkdir(out_path)
         
-    im_batch_size = 20
+    im_batch_size = args.batch_size
     
     if n_images<im_batch_size:
         im_batch_size = n_images
@@ -62,8 +62,8 @@ def save_images(args,netG,device,out_path):
         if i_batch ==  n_batches*im_batch_size:
             im_batch_size = n_images - i_batch
         
-        h = args_model.num_patches_h
-        w = args_model.num_patches_w   
+        h = args_model.num_patches_h = 3
+        w = args_model.num_patches_w  =3 
         b_size = im_batch_size*h*w
         #print()
         #print(b_size)
