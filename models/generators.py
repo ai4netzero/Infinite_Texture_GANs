@@ -73,8 +73,8 @@ class Res_Generator(nn.Module):
         h = self.block2(h, y)
         h = self.up(h) # 16x16
         h = self.block3(h, y)
-        #if self.att:
-        #    h = self.attention(h)
+        if self.att:
+            h = self.attention(h)
         h = self.up(h) #32x32
         h = self.block4(h,y)
         if self.n_layers_G >=5:
