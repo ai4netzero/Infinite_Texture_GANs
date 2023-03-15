@@ -12,7 +12,13 @@ def conv3x3(ch_in,ch_out,SN = False,s = 1,p=1,bias = True,padding_mode='zeros'):
         return SpectralNorm(nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=p, stride=s,bias = bias,padding_mode =padding_mode))
     else:
         return nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=p,stride=s,bias = bias,padding_mode =padding_mode)
-
+    
+def conv7x7(ch_in,ch_out,SN = False,s = 1,p=1,bias = True,padding_mode='zeros'):
+    if SN:
+        return SpectralNorm(nn.Conv2d(ch_in, ch_out, kernel_size=7, padding=p, stride=s,bias = bias,padding_mode =padding_mode))
+    else:
+        return nn.Conv2d(ch_in, ch_out, kernel_size=7, padding=p,stride=s,bias = bias,padding_mode =padding_mode)
+    
 def Linear(ch_in,ch_out,SN = False,bias = True):
     if SN:
         return SpectralNorm(nn.Linear(ch_in,ch_out,bias = bias).apply(init_weight))
@@ -96,10 +102,16 @@ class ConditionalNorm(nn.Module):
             self.embed = conv1x1(128, out_channels,bias = True,SN=SN)
         elif self.cond_method == 'conv3x3': # SPADE 
             self.mlp_shared = nn.Sequential(
-            conv3x3(n_condition, 128,bias = True,SN=SN),
+            conv3x3(n_condition, 128,bias = True,SN=SN,p=0),
             nn.ReLU()
             )
-            self.embed = conv3x3(128, out_channels,bias = True,SN=SN)
+            self.embed = conv3x3(128, out_channels,bias = True,SN=SN,p=0)
+        elif self.cond_method == 'conv7x7': # SPADE 
+            self.mlp_shared = nn.Sequential(
+            conv7x7(n_condition, 128,bias = True,SN=SN,p=0),
+            nn.ReLU()
+            )
+            self.embed = conv7x7(128, out_channels,bias = True,SN=SN,p=0)            
         else: # CBN
             self.embed = Linear(n_condition, out_channels,bias = True,SN=SN)
 
@@ -118,7 +130,7 @@ class ConditionalNorm(nn.Module):
             beta = beta.unsqueeze(2).unsqueeze(3)
         elif 'conv' in self.cond_method:
             label = label.view(-1,self.n_condition,label.size(-2),label.size(-1))
-            label = F.interpolate(label, size=inputs.size()[2:], mode=self.spade_upsampling)
+            #label = F.interpolate(label, size=inputs.size()[2:], mode=self.spade_upsampling)
             #label = nn.Upsample(size= inputs.size(-1))(label)
             actv  = self.mlp_shared(label.float())
             embed = self.embed(actv)
@@ -157,7 +169,7 @@ class Attention(nn.Module):
     
     
 class ResBlockGenerator(nn.Module):
-    def __init__(self,args, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0,coord_emb_dim = None):
+    def __init__(self,args, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0,coord_emb_dim = None,G_cond_method = None):
         super(ResBlockGenerator, self).__init__()
         hidden_channels = out_channels if hidden_channels is None else hidden_channels
         
@@ -165,6 +177,9 @@ class ResBlockGenerator(nn.Module):
         self.learnable_sc = (in_channels != out_channels) #or upsample
         self.padding_mode = args.G_padding
         self.type_norm = args.type_norm
+        
+        if G_cond_method is None:
+            G_cond_method = args.G_cond_method
 
         # setting dim = 0 when no cooord used
         if  coord_emb_dim is None:
@@ -181,10 +196,10 @@ class ResBlockGenerator(nn.Module):
             self.bn2 = nn.BatchNorm2d(hidden_channels)
             self.condnorm = False
         else:                
-            self.bn1 = ConditionalNorm(args,in_channels,n_classes,SN= args.spec_norm_G,cond_method=args.G_cond_method,type_norm = self.type_norm)
-            self.bn2 = ConditionalNorm(args,hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method,type_norm = self.type_norm)
+            self.bn1 = ConditionalNorm(args,in_channels,n_classes,SN= args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
+            self.bn2 = ConditionalNorm(args,hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
             if self.learnable_sc:
-                self.bn3 = ConditionalNorm(args,in_channels,n_classes,SN=args.spec_norm_G,cond_method=args.G_cond_method,type_norm = self.type_norm)
+                self.bn3 = ConditionalNorm(args,in_channels,n_classes,SN=args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
 
             self.condnorm = True
 

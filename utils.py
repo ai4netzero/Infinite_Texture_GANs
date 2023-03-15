@@ -498,18 +498,29 @@ def sample_patches_from_gen_2D(args,b_size,netG,device ='cpu'):
     n_imgs = b_size//num_patches_per_img
 
     # Generate global stochastic map for each image. (+2 is added for padding: two rows and two columns)
-    maps_merged =  torch.randn(n_imgs,args.n_cl,(h+2)* args.m_dim,(w+2)*args.m_dim).to(device)#.numpy() # (n_imgs,ch,H,W)
+    #maps_merged =  torch.randn(n_imgs,args.n_cl,(h+2)* args.m_dim,(w+2)*args.m_dim).to(device)#.numpy() # (n_imgs,ch,H,W)
 
     # Crop the large map into smaller map for each image patch. The cropping size is 3x3, i.e., 8 surrounding patches.
-    maps = crop_fun_(maps_merged,args.num_neighbors*args.m_dim,args.num_neighbors*args.m_dim,args.m_dim,device = device) #(bs,ch,3*m_dim,3*m_dim)
+    #maps = crop_fun_(maps_merged,args.num_neighbors*args.m_dim,args.num_neighbors*args.m_dim,args.m_dim,device = device) #(bs,ch,3*m_dim,3*m_dim)
     
+    maps_per_res = []
+    pad_sizes = [4,4,4,12,12,12]
+    for i in range(0,args.n_layers_G):
+        res = (2**i)*args.base_res
+        pad_size = pad_sizes[i]
+        maps_merged =  torch.randn(n_imgs,args.n_cl,h*res+pad_size,w*res+pad_size).to(device)
+        res_withpadd = res+pad_size
+        
+        maps = crop_fun_(maps_merged,res_withpadd,res_withpadd,res,device = device)
+        maps_per_res.append(maps)
+
    
 
-    y_G = maps
+    y_G = maps_per_res
     y_D = None
     fake = netG(z, y_G)
     
-    return fake, y_D
+    return fake, maps_per_res
 
 def random_sample_coord_grid(args,meta_grid,h=6, w= 6,n_imgs = 1):
 

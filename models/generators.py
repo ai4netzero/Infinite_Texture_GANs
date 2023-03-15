@@ -41,18 +41,18 @@ class Res_Generator(nn.Module):
         
         self.dense = Linear(self.z_dim, base_res * base_res * self.base_ch*8,SN=SN)
         
-        self.block1 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*8,upsample=True,n_classes = n_classes)
-        self.block2 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*4,upsample=True,n_classes = n_classes)
-        self.block3 = ResBlockGenerator(args,self.base_ch*4, self.base_ch*2,upsample=True,n_classes = n_classes)
+        self.block1 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*8,upsample=True,n_classes = n_classes,G_cond_method = 'conv3x3')
+        self.block2 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*4,upsample=True,n_classes = n_classes,G_cond_method = 'conv3x3')
+        self.block3 = ResBlockGenerator(args,self.base_ch*4, self.base_ch*2,upsample=True,n_classes = n_classes,G_cond_method = 'conv3x3')
         if self.att:
             self.attention = Attention(self.base_ch*2,SN=SN)
-        self.block4 = ResBlockGenerator(args,self.base_ch*2, self.base_ch,upsample=True,n_classes = n_classes)
+        self.block4 = ResBlockGenerator(args,self.base_ch*2, self.base_ch,upsample=True,n_classes = n_classes,G_cond_method = 'conv7x7')
         if n_layers_G>=5:
             final_chin = self.base_ch//2
-            self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,upsample=True,n_classes = n_classes)
+            self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,upsample=True,n_classes = n_classes,G_cond_method = 'conv7x7')
             if n_layers_G == 6:
                 final_chin = self.base_ch//4
-                self.block6 = ResBlockGenerator(args,self.base_ch//2, self.base_ch//4,upsample=True,n_classes = n_classes)
+                self.block6 = ResBlockGenerator(args,self.base_ch//2, self.base_ch//4,upsample=True,n_classes = n_classes,G_cond_method = 'conv7x7')
         else:
             final_chin = self.base_ch
         #self.bn = nn.BatchNorm2d(final_chin)
@@ -68,21 +68,21 @@ class Res_Generator(nn.Module):
         h = self.dense(z).view(-1,self.base_ch*8, self.base_res, self.base_res)
         #if coord_grids is None:
         #    coord_grids = [coord_grids]*self.n_layers_G
-        h = self.block1(h,y)
+        h = self.block1(h,y[0])
         h = self.up(h) # 8x8
-        h = self.block2(h, y)
+        h = self.block2(h, y[1])
         h = self.up(h) # 16x16
-        h = self.block3(h, y)
+        h = self.block3(h, y[2])
         if self.att:
             h = self.attention(h)
         h = self.up(h) #32x32
-        h = self.block4(h,y)
+        h = self.block4(h,y[3])
         if self.n_layers_G >=5:
             h = self.up(h) # 64x64
-            h = self.block5(h,y)
+            h = self.block5(h,y[4])
         if self.n_layers_G == 6:
             h = self.up(h) # 128x128
-            h = self.block6(h,y)
+            h = self.block6(h,y[5])
         #h = self.bn(h)
         h = self.activation(h)
         h = self.final(h)
