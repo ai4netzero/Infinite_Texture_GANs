@@ -46,13 +46,13 @@ class Res_Generator(nn.Module):
         self.block3 = ResBlockGenerator(args,self.base_ch*4, self.base_ch*2,upsample=True,n_classes = n_classes,G_cond_method = 'conv3x3')
         if self.att:
             self.attention = Attention(self.base_ch*2,SN=SN)
-        self.block4 = ResBlockGenerator(args,self.base_ch*2, self.base_ch,upsample=True,n_classes = n_classes,G_cond_method = 'conv7x7')
+        self.block4 = ResBlockGenerator(args,self.base_ch*2, self.base_ch,upsample=True,n_classes = n_classes,G_cond_method = 'conv3x3')
         if n_layers_G>=5:
             final_chin = self.base_ch//2
-            self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,upsample=True,n_classes = n_classes,G_cond_method = 'conv7x7')
+            self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,upsample=True,n_classes = n_classes,G_cond_method = 'conv3x3')
             if n_layers_G == 6:
                 final_chin = self.base_ch//4
-                self.block6 = ResBlockGenerator(args,self.base_ch//2, self.base_ch//4,upsample=True,n_classes = n_classes,G_cond_method = 'conv7x7')
+                self.block6 = ResBlockGenerator(args,self.base_ch//2, self.base_ch//4,upsample=True,n_classes = n_classes,G_cond_method = 'conv3x3')
         else:
             final_chin = self.base_ch
         #self.bn = nn.BatchNorm2d(final_chin)

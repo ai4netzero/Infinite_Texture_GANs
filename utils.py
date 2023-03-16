@@ -504,7 +504,7 @@ def sample_patches_from_gen_2D(args,b_size,netG,device ='cpu'):
     #maps = crop_fun_(maps_merged,args.num_neighbors*args.m_dim,args.num_neighbors*args.m_dim,args.m_dim,device = device) #(bs,ch,3*m_dim,3*m_dim)
     
     maps_per_res = []
-    pad_sizes = [4,4,4,12,12,12]
+    pad_sizes = [4,4,4,4,4,4]
     for i in range(0,args.n_layers_G):
         res = (2**i)*args.base_res
         pad_size = pad_sizes[i]
