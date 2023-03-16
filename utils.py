@@ -505,21 +505,27 @@ def sample_patches_from_gen_2D(args,b_size,netG,device ='cpu'):
     
     maps_per_res = []
     pad_sizes = [4,4,4,4,4,4]
+    resols = [(8,6),(16,14),(32,30),(64,62),(128,126)]
     for i in range(0,args.n_layers_G):
-        res = (2**i)*args.base_res
+        #res = (2**i)*args.base_res
+        res1,res2 = resols[i]
         pad_size = pad_sizes[i]
-        maps_merged =  torch.randn(n_imgs,args.n_cl,h*res+pad_size,w*res+pad_size).to(device)
-        res_withpadd = res+pad_size
+        maps_merged =  torch.randn(n_imgs,args.n_cl,h*res1+pad_size,w*res1+pad_size).to(device)
+        res_withpadd = res1+pad_size
+        maps1 = crop_fun_(maps_merged,res_withpadd,res_withpadd,res1,device = device)
         
-        maps = crop_fun_(maps_merged,res_withpadd,res_withpadd,res,device = device)
-        maps_per_res.append(maps)
+        maps_merged =  torch.randn(n_imgs,args.n_cl,h*res2+pad_size,w*res2+pad_size).to(device)
+        res_withpadd = res2+pad_size
+        maps2 = crop_fun_(maps_merged,res_withpadd,res_withpadd,res2,device = device)
+        maps_per_res.append((maps1,maps2))
 
    
 
     y_G = maps_per_res
     y_D = None
     fake = netG(z, y_G)
-    
+    #print(fake.shape)
+    #exit()
     return fake, maps_per_res
 
 def random_sample_coord_grid(args,meta_grid,h=6, w= 6,n_imgs = 1):

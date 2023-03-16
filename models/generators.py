@@ -6,8 +6,8 @@ import torch
 import torch.nn.functional as F
 from models.layers import *
 
-from utils import *
-
+#from utils import *
+import utils
         
 
 class Res_Generator(nn.Module):
@@ -64,10 +64,10 @@ class Res_Generator(nn.Module):
         
     def overlap_padding(self,input):
         _,_,dx,dy = input.size()
-        merged_input = merge_patches_2D(input,h = self.num_patches_h,w = self.num_patches_w,device = input.device)
+        merged_input = utils.merge_patches_2D(input,h = self.num_patches_h,w = self.num_patches_w,device = input.device)
         merged_input = F.pad(merged_input, (2,2,2,2), "replicate", 0) 
         res_withpadd = dx +4
-        padded_input = crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
+        padded_input = utils.crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
         return padded_input
 
 
@@ -77,25 +77,35 @@ class Res_Generator(nn.Module):
             z = torch.cat((z,y),1)
             y = None
         h = self.dense(z).view(-1,self.base_ch*8, self.base_res, self.base_res)
+        #print(h.shape)
         #if coord_grids is None:
         #    coord_grids = [coord_grids]*self.n_layers_G
         h = self.block1(h,y[0])
+        #print(h[:9,0])
         h = self.overlap_padding(h)
-        print(h.shape)
+        #print(h.shape)
+        #print(h[:9,0])
+
+        #exit()
         h = self.up(h) # 8x8
         h = self.block2(h, y[1])
+        h = self.overlap_padding(h)
         h = self.up(h) # 16x16
         h = self.block3(h, y[2])
+        h = self.overlap_padding(h)
         if self.att:
             h = self.attention(h)
         h = self.up(h) #32x32
         h = self.block4(h,y[3])
+        h = self.overlap_padding(h)
         if self.n_layers_G >=5:
             h = self.up(h) # 64x64
             h = self.block5(h,y[4])
+            h = self.overlap_padding(h)
         if self.n_layers_G == 6:
             h = self.up(h) # 128x128
             h = self.block6(h,y[5])
+            h = self.overlap_padding(h)
         #h = self.bn(h)
         h = self.activation(h)
         h = self.final(h)

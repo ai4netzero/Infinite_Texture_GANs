@@ -135,6 +135,7 @@ class ConditionalNorm(nn.Module):
             actv  = self.mlp_shared(label.float())
             embed = self.embed(actv)
             gamma, beta = embed.chunk(2, dim=1)
+            #print(gamma.shape,beta.shape)
         else:
             embed = self.embed(label.float())
             gamma, beta = embed.chunk(2, dim=1)
@@ -187,8 +188,11 @@ class ResBlockGenerator(nn.Module):
 
         self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
         self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
-        if self.learnable_sc:
-            self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
+        #if self.learnable_sc:
+            #self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
+        #    self.conv3 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
+        #    self.conv4 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
+
         #self.upsampling = nn.Upsample(scale_factor=2)
 
         if n_classes == 0 : #and 'conv' not in args.G_cond_method:
@@ -198,8 +202,8 @@ class ResBlockGenerator(nn.Module):
         else:                
             self.bn1 = ConditionalNorm(args,in_channels,n_classes,SN= args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
             self.bn2 = ConditionalNorm(args,hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
-            if self.learnable_sc:
-                self.bn3 = ConditionalNorm(args,in_channels,n_classes,SN=args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
+            #if self.learnable_sc:
+            #    self.bn3 = ConditionalNorm(args,in_channels,n_classes,SN=args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
 
             self.condnorm = True
 
@@ -213,13 +217,15 @@ class ResBlockGenerator(nn.Module):
             if self.condnorm >0:
                 x = self.bn3(x,y)
             x = self.conv3(x)
+            x = self.conv4(x)
+
             return x
         else:
             return x
 
     def forward(self, x,y=None,coord=None):
         if self.condnorm >0:
-            out = self.activation(self.bn1(x,y))
+            out = self.activation(self.bn1(x,y[0]))
         else:
             out = self.activation(self.bn1(x))
 
@@ -232,7 +238,7 @@ class ResBlockGenerator(nn.Module):
 
         out = self.conv1(out)
         if self.condnorm >0:
-            out = self.activation(self.bn2(out,y))
+            out = self.activation(self.bn2(out,y[1]))
         else:
             out = self.activation(self.bn2(out))
 
@@ -240,8 +246,9 @@ class ResBlockGenerator(nn.Module):
             out = torch.cat((out,coord),1)
 
         out = self.conv2(out)
-        out_res = self.shortcut(x,y,coord)
-        return out + out_res
+        #out_res = self.shortcut(x,y,coord)
+        #print(out.shape,out_res.shape)
+        return out #+ out_res
 
 class ResBlockDiscriminator(nn.Module):
 
