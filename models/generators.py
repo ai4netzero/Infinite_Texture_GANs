@@ -26,6 +26,9 @@ class Res_Generator(nn.Module):
         self.SN =SN =  args.spec_norm_G
         self.padding_mode = args.G_padding
         self.upsampling_mode = args.G_upsampling
+        self.num_patches_h = args.num_patches_h
+        self.num_patches_w = args.num_patches_w
+
         #
 
         self.up = nn.Upsample(scale_factor=2,mode = args.G_upsampling)
@@ -57,9 +60,17 @@ class Res_Generator(nn.Module):
             final_chin = self.base_ch
         #self.bn = nn.BatchNorm2d(final_chin)
 
-        self.final = conv3x3(final_chin,self.img_ch,SN = SN,padding_mode=self.padding_mode).apply(init_weight)
+        self.final = conv3x3(final_chin,self.img_ch,SN = SN,padding_mode=self.padding_mode,p=0).apply(init_weight)
         
-    
+    def overlap_padding(self,input):
+        _,_,dx,dy = input.size()
+        merged_input = merge_patches_2D(input,h = self.num_patches_h,w = self.num_patches_w,device = input.device)
+        merged_input = F.pad(merged_input, (2,2,2,2), "replicate", 0) 
+        res_withpadd = dx +4
+        padded_input = crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
+        return padded_input
+
+
 
     def forward(self, z,y=None):
         if self.cond_method =='concat':
@@ -69,6 +80,8 @@ class Res_Generator(nn.Module):
         #if coord_grids is None:
         #    coord_grids = [coord_grids]*self.n_layers_G
         h = self.block1(h,y[0])
+        h = self.overlap_padding(h)
+        print(h.shape)
         h = self.up(h) # 8x8
         h = self.block2(h, y[1])
         h = self.up(h) # 16x16

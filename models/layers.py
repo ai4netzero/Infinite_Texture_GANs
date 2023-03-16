@@ -185,8 +185,8 @@ class ResBlockGenerator(nn.Module):
         if  coord_emb_dim is None:
             coord_emb_dim = 0
 
-        self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G,padding_mode=self.padding_mode).apply(init_weight)
-        self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G,padding_mode=self.padding_mode).apply(init_weight)
+        self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
+        self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
         if self.learnable_sc:
             self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
         #self.upsampling = nn.Upsample(scale_factor=2)
