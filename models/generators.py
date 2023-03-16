@@ -62,11 +62,11 @@ class Res_Generator(nn.Module):
 
         self.final = conv3x3(final_chin,self.img_ch,SN = SN,padding_mode=self.padding_mode,p=0).apply(init_weight)
         
-    def overlap_padding(self,input):
+    def overlap_padding(self,input,pad_size =2,conv_red = 2):
         _,_,dx,dy = input.size()
         merged_input = utils.merge_patches_2D(input,h = self.num_patches_h,w = self.num_patches_w,device = input.device)
-        merged_input = F.pad(merged_input, (2,2,2,2), "replicate", 0) 
-        res_withpadd = dx +4
+        merged_input = F.pad(merged_input, (pad_size,pad_size,pad_size,pad_size), "replicate", 0) 
+        res_withpadd = dx +pad_size*conv_red
         padded_input = utils.crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
         return padded_input
 
@@ -97,15 +97,16 @@ class Res_Generator(nn.Module):
             h = self.attention(h)
         h = self.up(h) #32x32
         h = self.block4(h,y[3])
-        h = self.overlap_padding(h)
         if self.n_layers_G >=5:
+            h = self.overlap_padding(h)
             h = self.up(h) # 64x64
             h = self.block5(h,y[4])
-            h = self.overlap_padding(h)
         if self.n_layers_G == 6:
+            h = self.overlap_padding(h)
             h = self.up(h) # 128x128
             h = self.block6(h,y[5])
-            h = self.overlap_padding(h)
+        
+        h = self.overlap_padding(h,pad_size = 1)
         #h = self.bn(h)
         h = self.activation(h)
         h = self.final(h)
