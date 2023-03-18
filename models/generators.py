@@ -77,33 +77,27 @@ class Res_Generator(nn.Module):
             z = torch.cat((z,y),1)
             y = None
         h = self.dense(z).view(-1,self.base_ch*8, self.base_res, self.base_res)
-        #print(h.shape)
-        #if coord_grids is None:
-        #    coord_grids = [coord_grids]*self.n_layers_G
+       
         h = self.block1(h,y[0])
-        #print(h[:9,0])
+        h = self.up(h) # 8x8
         h = self.overlap_padding(h)
         #print(h.shape)
-        #print(h[:9,0])
-
-        #exit()
-        h = self.up(h) # 8x8
         h = self.block2(h, y[1])
-        h = self.overlap_padding(h)
         h = self.up(h) # 16x16
-        h = self.block3(h, y[2])
         h = self.overlap_padding(h)
+        h = self.block3(h, y[2])
         if self.att:
             h = self.attention(h)
         h = self.up(h) #32x32
+        h = self.overlap_padding(h)
         h = self.block4(h,y[3])
         if self.n_layers_G >=5:
-            h = self.overlap_padding(h)
             h = self.up(h) # 64x64
+            h = self.overlap_padding(h)
             h = self.block5(h,y[4])
         if self.n_layers_G == 6:
-            h = self.overlap_padding(h)
             h = self.up(h) # 128x128
+            h = self.overlap_padding(h)
             h = self.block6(h,y[5])
         
         h = self.overlap_padding(h,pad_size = 1)

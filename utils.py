@@ -506,8 +506,15 @@ def sample_patches_from_gen_2D(args,b_size,netG,device ='cpu'):
     maps_per_res = []
     pad_sizes = [4,4,4,4,4,4]
     #resols = [(8,6),(16,14),(32,30),(64,62),(128,126)]
+    #resols = [(8,6),(12,10),(20,18),(36,34),(128,126)]
+
     for i in range(0,args.n_layers_G):
-        res1 = (2**i)*args.base_res
+        #res1 = (2**i)*args.base_res
+        #res2 = res1-2
+        if i == 0:
+            res1 = (2**i)*args.base_res
+        else:
+            res1 = (2**(i-1))*args.base_res+4
         res2 = res1-2
         #res1,res2 = resols[i]
         pad_size = pad_sizes[i]
