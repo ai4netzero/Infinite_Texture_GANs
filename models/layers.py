@@ -4,7 +4,8 @@ import torch.nn.utils.spectral_norm as SpectralNorm
 import numpy as np
 import torch
 import torch.nn.functional as F
-from utils import *
+#from utils import *
+import utils
 
 
 def conv3x3(ch_in,ch_out,SN = False,s = 1,p=1,bias = True,padding_mode='zeros'):
@@ -178,6 +179,8 @@ class ResBlockGenerator(nn.Module):
         self.learnable_sc = (in_channels != out_channels) #or upsample
         self.padding_mode = args.G_padding
         self.type_norm = args.type_norm
+        self.num_patches_h = args.num_patches_h
+        self.num_patches_w = args.num_patches_w
         
         if G_cond_method is None:
             G_cond_method = args.G_cond_method
@@ -223,7 +226,7 @@ class ResBlockGenerator(nn.Module):
         else:
             return x
 
-    def forward(self, x,y=None,coord=None):
+    def forward(self, x,y=None,coord=None,num_patches_h=None,num_patches_w=None):
         if self.condnorm >0:
             out = self.activation(self.bn1(x,y[0]))
         else:
@@ -235,7 +238,8 @@ class ResBlockGenerator(nn.Module):
         if coord is not None:
             #print(coord.shape)
             out = torch.cat((out,coord),1)
-
+            
+        out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w)
         out = self.conv1(out)
         if self.condnorm >0:
             out = self.activation(self.bn2(out,y[1]))
@@ -244,7 +248,8 @@ class ResBlockGenerator(nn.Module):
 
         if coord is not None:
             out = torch.cat((out,coord),1)
-
+            
+        out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w)
         out = self.conv2(out)
         #out_res = self.shortcut(x,y,coord)
         #print(out.shape,out_res.shape)

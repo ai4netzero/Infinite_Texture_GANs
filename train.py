@@ -211,7 +211,7 @@ def train(num_epochs=1, disc_iters=1):
                     fake_x, fake_y = sample_patches_from_gen_1D(args,G_b_size, zdim,args.zdim_b,args.num_patches_per_img, n_cl, netG,device,real_y=real_y)
                     fake_x = merge_patches_1D(fake_x,args.num_patches_per_img,device)
                 elif args.G_patch_2D:
-                    fake_x, fake_y = sample_patches_from_gen_2D(args,G_b_size, netG,device)
+                    fake_x, fake_y = sample_patches_from_gen_2D(args=args,b_size=G_b_size, netG=netG,device=device)
                     fake_x = merge_patches_2D(fake_x,h = args.num_patches_h,w = args.num_patches_w,device = device)
                 else:
                     fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
@@ -237,7 +237,7 @@ def train(num_epochs=1, disc_iters=1):
                     fake_x, fake_y = sample_patches_from_gen_1D(args,G_b_size, zdim,args.zdim_b,args.num_patches_per_img, n_cl, netG,device,real_y=real_y)
                     fake_x = merge_patches_1D(fake_x,args.num_patches_per_img)
                 elif args.G_patch_2D:
-                    fake_x, fake_y = sample_patches_from_gen_2D(args,G_b_size, netG,device)
+                    fake_x, fake_y = sample_patches_from_gen_2D(args=args,b_size=G_b_size, netG=netG,device=device)
                     fake_x = merge_patches_2D(fake_x,h = args.num_patches_h,w = args.num_patches_w,device = device)
                 else:
                     fake_x, fake_y = sample_from_gen(args,G_b_size, zdim, n_cl, netG,device,real_y=real_y)
