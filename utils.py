@@ -522,12 +522,8 @@ def sample_patches_from_gen_2D(args,b_size,netG,h=None,w=None,device ='cpu'):
         pad_size = pad_sizes[i]
         maps_merged =  torch.randn(n_imgs,args.n_cl,h*res1+pad_size,w*res1+pad_size).to(device)
         res_withpadd = res1+pad_size
-        maps1 = crop_fun_(maps_merged,res_withpadd,res_withpadd,res1,device = device)
-        
-        maps_merged =  torch.randn(n_imgs,args.n_cl,h*res2+pad_size,w*res2+pad_size).to(device)
-        res_withpadd = res2+pad_size
-        maps2 = crop_fun_(maps_merged,res_withpadd,res_withpadd,res2,device = device)
-        maps_per_res.append((maps1,maps2))
+        maps = crop_fun_(maps_merged,res_withpadd,res_withpadd,res1,device = device)
+        maps_per_res.append((maps))
 
    
 

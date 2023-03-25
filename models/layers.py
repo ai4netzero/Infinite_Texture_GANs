@@ -171,7 +171,7 @@ class Attention(nn.Module):
     
     
 class ResBlockGenerator(nn.Module):
-    def __init__(self,args, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0,coord_emb_dim = None,G_cond_method = None):
+    def __init__(self,args, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0,G_cond_method = None):
         super(ResBlockGenerator, self).__init__()
         hidden_channels = out_channels if hidden_channels is None else hidden_channels
         
@@ -185,14 +185,11 @@ class ResBlockGenerator(nn.Module):
         if G_cond_method is None:
             G_cond_method = args.G_cond_method
 
-        # setting dim = 0 when no cooord used
-        if  coord_emb_dim is None:
-            coord_emb_dim = 0
 
-        self.conv1 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
-        self.conv2 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
-        #if self.learnable_sc:
-            #self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
+        self.conv1 = conv3x3(in_channels,hidden_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
+        self.conv2 = conv3x3(hidden_channels,out_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
+        if self.learnable_sc:
+            self.conv3 = conv1x1(in_channels,out_channels,args.spec_norm_G).apply(init_weight)
         #    self.conv3 = conv3x3(in_channels+coord_emb_dim,hidden_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
         #    self.conv4 = conv3x3(hidden_channels+coord_emb_dim,out_channels,args.spec_norm_G,padding_mode=self.padding_mode,p=0).apply(init_weight)
 
@@ -205,8 +202,8 @@ class ResBlockGenerator(nn.Module):
         else:                
             self.bn1 = ConditionalNorm(args,in_channels,n_classes,SN= args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
             self.bn2 = ConditionalNorm(args,hidden_channels,n_classes,SN=args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
-            #if self.learnable_sc:
-            #    self.bn3 = ConditionalNorm(args,in_channels,n_classes,SN=args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
+            if self.learnable_sc:
+                self.bn3 = ConditionalNorm(args,in_channels,n_classes,SN=args.spec_norm_G,cond_method=G_cond_method,type_norm = self.type_norm)
 
             self.condnorm = True
 
@@ -215,45 +212,33 @@ class ResBlockGenerator(nn.Module):
         else:
             self.activation = nn.ReLU() 
 
-    def shortcut(self, x,y=None,coord=None):
+    def shortcut(self, x,y=None):
         if self.learnable_sc:
             if self.condnorm >0:
                 x = self.bn3(x,y)
             x = self.conv3(x)
-            x = self.conv4(x)
-
             return x
         else:
             return x
 
-    def forward(self, x,y=None,coord=None,num_patches_h=None,num_patches_w=None):
+    def forward(self, x,y=None,num_patches_h=None,num_patches_w=None):
         if self.condnorm >0:
-            out = self.activation(self.bn1(x,y[0]))
+            out = self.activation(self.bn1(x,y))
         else:
             out = self.activation(self.bn1(x))
-
-        #if self.upsample:
-        #     out = self.upsampling(out)
-
-        if coord is not None:
-            #print(coord.shape)
-            out = torch.cat((out,coord),1)
             
         out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w)
         out = self.conv1(out)
         if self.condnorm >0:
-            out = self.activation(self.bn2(out,y[1]))
+            out = self.activation(self.bn2(out,y))
         else:
             out = self.activation(self.bn2(out))
 
-        if coord is not None:
-            out = torch.cat((out,coord),1)
             
         out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w)
         out = self.conv2(out)
-        #out_res = self.shortcut(x,y,coord)
-        #print(out.shape,out_res.shape)
-        return out #+ out_res
+        out_res = self.shortcut(x,y)
+        return out + out_res
 
 class ResBlockDiscriminator(nn.Module):
 
