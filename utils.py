@@ -483,7 +483,7 @@ def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num
     
     return fake, y_D
 
-def sample_patches_from_gen_2D(args,b_size,netG,device ='cpu'): 
+def sample_patches_from_gen_2D(args,b_size,netG,h=None,w=None,device ='cpu'): 
 
     # latent z
     if args.z_dist == 'normal': 
@@ -492,8 +492,9 @@ def sample_patches_from_gen_2D(args,b_size,netG,device ='cpu'):
         z =2*torch.rand(b_size, args.zdim).to(device=device) -1
 
     #border z
-    h = args.num_patches_h
-    w = args.num_patches_w
+    if h is None or w is None:
+        h = args.num_patches_h
+        w = args.num_patches_w
     num_patches_per_img = h*w
     n_imgs = b_size//num_patches_per_img
 
@@ -531,7 +532,7 @@ def sample_patches_from_gen_2D(args,b_size,netG,device ='cpu'):
 
     y_G = maps_per_res
     y_D = None
-    fake = netG(z, y_G)
+    fake = netG(z, y_G,h,w)
     #print(fake.shape)
     #exit()
     return fake, maps_per_res

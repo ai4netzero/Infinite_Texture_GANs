@@ -62,9 +62,12 @@ class Res_Generator(nn.Module):
 
         self.final = conv3x3(final_chin,self.img_ch,SN = SN,padding_mode=self.padding_mode,p=0).apply(init_weight)
         
-    def overlap_padding(self,input,pad_size =2,conv_red = 2):
+    def overlap_padding(self,input,pad_size =2,conv_red = 2,h=None,w = None):
         _,_,dx,dy = input.size()
-        merged_input = utils.merge_patches_2D(input,h = self.num_patches_h,w = self.num_patches_w,device = input.device)
+        if h is None or w is None:
+            h = self.num_patches_h
+            w = self.num_patches_w
+        merged_input = utils.merge_patches_2D(input,h = h,w = w,device = input.device)
         merged_input = F.pad(merged_input, (pad_size,pad_size,pad_size,pad_size), "replicate", 0) 
         res_withpadd = dx +pad_size*conv_red
         padded_input = utils.crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
@@ -72,7 +75,7 @@ class Res_Generator(nn.Module):
 
 
 
-    def forward(self, z,y=None):
+    def forward(self, z,y=None,num_patches_h=None,num_patches_w=None):
         if self.cond_method =='concat':
             z = torch.cat((z,y),1)
             y = None
@@ -80,27 +83,27 @@ class Res_Generator(nn.Module):
        
         h = self.block1(h,y[0])
         h = self.up(h) # 8x8
-        h = self.overlap_padding(h)
+        h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
         #print(h.shape)
         h = self.block2(h, y[1])
         h = self.up(h) # 16x16
-        h = self.overlap_padding(h)
+        h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
         h = self.block3(h, y[2])
         if self.att:
             h = self.attention(h)
         h = self.up(h) #32x32
-        h = self.overlap_padding(h)
+        h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
         h = self.block4(h,y[3])
         if self.n_layers_G >=5:
             h = self.up(h) # 64x64
-            h = self.overlap_padding(h)
+            h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
             h = self.block5(h,y[4])
         if self.n_layers_G == 6:
             h = self.up(h) # 128x128
-            h = self.overlap_padding(h)
+            h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
             h = self.block6(h,y[5])
         
-        h = self.overlap_padding(h,pad_size = 1)
+        h = self.overlap_padding(h,pad_size = 1,h=num_patches_h,w=num_patches_w)
         #h = self.bn(h)
         h = self.activation(h)
         h = self.final(h)
