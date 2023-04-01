@@ -485,13 +485,7 @@ def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num
 
 def sample_patches_from_gen_2D(args,b_size,netG,h=None,w=None,device ='cpu'): 
 
-    # latent z
-    if args.z_dist == 'normal': 
-        z = torch.randn(b_size, args.zdim).to(device=device)
-    elif args.z_dist =='uniform':
-        z =2*torch.rand(b_size, args.zdim).to(device=device) -1
-
-    #border z
+    
     if h is None or w is None:
         h = args.num_patches_h
         w = args.num_patches_w
@@ -504,10 +498,20 @@ def sample_patches_from_gen_2D(args,b_size,netG,h=None,w=None,device ='cpu'):
     # Crop the large map into smaller map for each image patch. The cropping size is 3x3, i.e., 8 surrounding patches.
     #maps = crop_fun_(maps_merged,args.num_neighbors*args.m_dim,args.num_neighbors*args.m_dim,args.m_dim,device = device) #(bs,ch,3*m_dim,3*m_dim)
     
+    
+    # latent z
+    if args.z_dist == 'normal': 
+        pad_size = 2
+        res_withpadd = args.base_res + pad_size
+        z_merged =  torch.randn(n_imgs,args.zdim,h*args.base_res+pad_size,w*args.base_res+pad_size).to(device)
+        z = crop_fun_(z_merged,res_withpadd,res_withpadd,args.base_res,device = device)
+
+        #z = torch.randn(b_size, args.zdim,self.base_res, self.base_res).to(device=device)
+    elif args.z_dist =='uniform':
+        z =2*torch.rand(b_size, args.zdim).to(device=device) -1
+    
     maps_per_res = []
-    pad_sizes = [4,4,4,4,4,4]
-    #resols = [(8,6),(16,14),(32,30),(64,62),(128,126)]
-    #resols = [(8,6),(12,10),(20,18),(36,34),(128,126)]
+    pad_sizes = [4,4,4,4,4,4]    
 
     for i in range(0,args.n_layers_G):
         #res1 = (2**i)*args.base_res
@@ -529,7 +533,7 @@ def sample_patches_from_gen_2D(args,b_size,netG,h=None,w=None,device ='cpu'):
 
     y_G = maps_per_res
     y_D = None
-    #print(z.device)
+    #print(z.shape)
     fake = netG(z, y_G,h,w)
     #print(fake.shape)
     #exit()

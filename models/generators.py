@@ -42,7 +42,8 @@ class Res_Generator(nn.Module):
         else:
             self.activation = nn.ReLU()  
         
-        self.dense = Linear(self.z_dim, base_res * base_res * self.base_ch*8,SN=SN)
+        #self.dense = Linear(self.z_dim, base_res * base_res * self.base_ch*8,SN=SN)
+        self.start = conv3x3(self.z_dim,self.base_ch*8,SN = SN,padding_mode=self.padding_mode,p=0).apply(init_weight)
         
         self.block1 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*8,upsample=True,n_classes = n_classes,G_cond_method = 'conv3x3')
         self.block2 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*4,upsample=True,n_classes = n_classes,G_cond_method = 'conv3x3')
@@ -73,8 +74,8 @@ class Res_Generator(nn.Module):
             num_patches_h = self.num_patches_h
             num_patches_w = self.num_patches_w
             
-        h = self.dense(z).view(-1,self.base_ch*8, self.base_res, self.base_res)
-       
+        #h = self.dense(z).view(-1,self.base_ch*8, self.base_res, self.base_res)
+        h = self.start(z)
         h = self.block1(h,y[0],num_patches_h=num_patches_h,num_patches_w=num_patches_w)
         h = self.up(h) # 8x8
         #h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
