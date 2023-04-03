@@ -492,14 +492,7 @@ def sample_patches_from_gen_2D(args,b_size,netG,h=None,w=None,device ='cpu'):
     num_patches_per_img = h*w
     n_imgs = b_size//num_patches_per_img
 
-    # Generate global stochastic map for each image. (+2 is added for padding: two rows and two columns)
-    #maps_merged =  torch.randn(n_imgs,args.n_cl,(h+2)* args.m_dim,(w+2)*args.m_dim).to(device)#.numpy() # (n_imgs,ch,H,W)
 
-    # Crop the large map into smaller map for each image patch. The cropping size is 3x3, i.e., 8 surrounding patches.
-    #maps = crop_fun_(maps_merged,args.num_neighbors*args.m_dim,args.num_neighbors*args.m_dim,args.m_dim,device = device) #(bs,ch,3*m_dim,3*m_dim)
-    
-    
-    # latent z
     if args.z_dist == 'normal': 
         pad_size = 2
         res_withpadd = args.base_res + pad_size
@@ -514,12 +507,7 @@ def sample_patches_from_gen_2D(args,b_size,netG,h=None,w=None,device ='cpu'):
     pad_sizes = [4,4,4,4,4,4]    
 
     for i in range(0,args.n_layers_G):
-        #res1 = (2**i)*args.base_res
-        #res2 = res1-2
-        #if i == 0:
-        #    res1 = (2**i)*args.base_res
-        #else:
-        #    res1 = (2**(i-1))*args.base_res+2
+    
         res1 = (2**i)*args.base_res
         res2 = res1
         #res1,res2 = resols[i]
@@ -538,6 +526,9 @@ def sample_patches_from_gen_2D(args,b_size,netG,h=None,w=None,device ='cpu'):
     #print(fake.shape)
     #exit()
     return fake, maps_per_res
+
+def scale_1D(args,b_size,netG,h=None,w=None,device ='cpu'): 
+
 
 def random_sample_coord_grid(args,meta_grid,h=6, w= 6,n_imgs = 1):
 
@@ -770,11 +761,16 @@ def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init
     #exit()
     return grid
 
-def overlap_padding(input,pad_size =2,conv_red = 2,h=3,w = 3):
+def overlap_padding(input,pad_size =2,conv_red = 2,h=3,w = 3,padding = 'repl',padding_values = None):
         _,_,dx,dy = input.size()
         
         merged_input = merge_patches_2D(input,h = h,w = w,device = input.device)
-        merged_input = F.pad(merged_input, (pad_size,pad_size,pad_size,pad_size), "replicate", 0) 
+        if padding == 'repl':
+            merged_input = F.pad(merged_input, (pad_size,pad_size,pad_size,pad_size), "replicate", 0) 
+        else:
+            merged_input = torch.cat((padding_values,merged_input),-1)
+            merged_input = F.pad(merged_input, (0,pad_size,pad_size,pad_size), "replicate", 0) 
+
         res_withpadd = dx +pad_size*conv_red
         padded_input = crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
         return padded_input

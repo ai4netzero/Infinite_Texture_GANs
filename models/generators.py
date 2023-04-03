@@ -62,11 +62,10 @@ class Res_Generator(nn.Module):
         #self.bn = nn.BatchNorm2d(final_chin)
 
         self.final = conv3x3(final_chin,self.img_ch,SN = SN,padding_mode=self.padding_mode,p=0).apply(init_weight)
+        
 
 
-
-
-    def forward(self, z,y=None,num_patches_h=None,num_patches_w=None):
+    def forward(self, z,y=None,num_patches_h=None,num_patches_w=None,padding_variable= None):
         if self.cond_method =='concat':
             z = torch.cat((z,y),1)
             y = None
@@ -76,33 +75,35 @@ class Res_Generator(nn.Module):
             
         #h = self.dense(z).view(-1,self.base_ch*8, self.base_res, self.base_res)
         h = self.start(z)
-        h = self.block1(h,y[0],num_patches_h=num_patches_h,num_patches_w=num_patches_w)
+        h = self.block1(h,y[0],num_patches_h=num_patches_h,num_patches_w=num_patches_w,padding_variable = padding_variable)
         h = self.up(h) # 8x8
         #h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
         #print(h.shape)
-        h = self.block2(h, y[1],num_patches_h=num_patches_h,num_patches_w=num_patches_w)
+        h = self.block2(h, y[1],num_patches_h=num_patches_h,num_patches_w=num_patches_w,padding_variable = padding_variable)
         h = self.up(h) # 16x16
         #h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
-        h = self.block3(h, y[2],num_patches_h=num_patches_h,num_patches_w=num_patches_w)
+        h = self.block3(h, y[2],num_patches_h=num_patches_h,num_patches_w=num_patches_w,padding_variable = padding_variable)
         if self.att:
             h = self.attention(h)
         h = self.up(h) #32x32
         #h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
-        h = self.block4(h,y[3],num_patches_h=num_patches_h,num_patches_w=num_patches_w)
+        h = self.block4(h,y[3],num_patches_h=num_patches_h,num_patches_w=num_patches_w,padding_variable = padding_variable)
         if self.n_layers_G >=5:
             h = self.up(h) # 64x64
             #h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
-            h = self.block5(h,y[4],num_patches_h=num_patches_h,num_patches_w=num_patches_w)
+            h = self.block5(h,y[4],num_patches_h=num_patches_h,num_patches_w=num_patches_w,padding_variable = padding_variable)
         if self.n_layers_G == 6:
             h = self.up(h) # 128x128
             #h = self.overlap_padding(h,h=num_patches_h,w=num_patches_w)
-            h = self.block6(h,y[5],num_patches_h=num_patches_h,num_patches_w=num_patches_w)
+            h = self.block6(h,y[5],num_patches_h=num_patches_h,num_patches_w=num_patches_w,padding_variable = padding_variable)
         
         h = utils.overlap_padding(h,pad_size = 1,h=num_patches_h,w=num_patches_w)
         #h = self.bn(h)
         h = self.activation(h)
         h = self.final(h)
-        return nn.Tanh()(h)
+        img = nn.Tanh()(h)
+        
+        return img, padding_variable
 
 
 class DC_Generator(nn.Module): # papers DCGAN or SNGAN
