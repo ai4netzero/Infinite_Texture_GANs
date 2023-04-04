@@ -171,7 +171,7 @@ class Attention(nn.Module):
     
     
 class ResBlockGenerator(nn.Module):
-    def __init__(self,args, in_channels, out_channels,hidden_channels=None, upsample=False,n_classes = 0,G_cond_method = None):
+    def __init__(self,args, in_channels, out_channels,hidden_channels=None,n_classes = 0,G_cond_method = None):
         super(ResBlockGenerator, self).__init__()
         hidden_channels = out_channels if hidden_channels is None else hidden_channels
         
@@ -221,24 +221,36 @@ class ResBlockGenerator(nn.Module):
         else:
             return x
 
-    def forward(self, x,y=None,num_patches_h=None,num_patches_w=None):
+    def forward(self, x,y=None,num_patches_h=None,num_patches_w=None,padding_variable=[None,None]):
         if self.condnorm >0:
             out = self.activation(self.bn1(x,y))
         else:
             out = self.activation(self.bn1(x))
-            
-        out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w)
+        
+        if self.training:
+            padding_variable_out_1 = None
+        else:
+            indeces = [1,4,7]
+            padding_variable_out_1 = out[indeces,:,:,-1]
+    
+        out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable=padding_variable[0])
         out = self.conv1(out)
         if self.condnorm >0:
             out = self.activation(self.bn2(out,y))
         else:
             out = self.activation(self.bn2(out))
 
-            
-        out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w)
+        if self.training:
+            padding_variable_out_2 = None
+        else:
+            indeces = [1,4,7]
+            padding_variable_out_2 = out[indeces,:,:,-1]
+
+        out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable=padding_variable[1])
         out = self.conv2(out)
         out_res = self.shortcut(x,y)
-        return out + out_res
+        out = out+out_res
+        return out,padding_variable_out_1,padding_variable_out_2
 
 class ResBlockDiscriminator(nn.Module):
 
