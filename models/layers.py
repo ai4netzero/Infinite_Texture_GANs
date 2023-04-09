@@ -227,30 +227,31 @@ class ResBlockGenerator(nn.Module):
         else:
             out = self.activation(self.bn1(x))
         
-        if self.training:
-            padding_variable_out_1 = None
-        else:
-            indeces = [1,4,7]
-            padding_variable_out_1 = out[indeces,:,:,-1]
-    
-        out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable=padding_variable[0])
+        #if out.size(-1) == 4:
+        #    print('sh')
+        #    torch.save(out, 'out_before.pt')
+        out,pad_var_out1 = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable=padding_variable[0])
+        #if out.size(-1) == 6:
+        #    torch.save(out, 'out_after.pt')
+        
+        #exit()
         out = self.conv1(out)
         if self.condnorm >0:
             out = self.activation(self.bn2(out,y))
         else:
             out = self.activation(self.bn2(out))
 
-        if self.training:
-            padding_variable_out_2 = None
-        else:
-            indeces = [1,4,7]
-            padding_variable_out_2 = out[indeces,:,:,-1]
 
-        out = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable=padding_variable[1])
+        out,pad_var_out2 = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable=padding_variable[1])
         out = self.conv2(out)
         out_res = self.shortcut(x,y)
         out = out+out_res
-        return out,padding_variable_out_1,padding_variable_out_2
+        
+        if self.training:
+            pad_var_out1 = pad_var_out2 =  None
+                
+    
+        return out,pad_var_out1,pad_var_out2
 
 class ResBlockDiscriminator(nn.Module):
 
