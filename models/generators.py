@@ -108,7 +108,7 @@ class Res_Generator(nn.Module):
             h,pad_var_1,pad_var_2 = self.block6(h,y[5],num_patches_h=num_patches_h,num_patches_w=num_patches_w,padding_variable = padding_variable[5])
             padding_variable_out.append([pad_var_1,pad_var_2])
         
-        h,pad_var_f = utils.overlap_padding(h,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable = padding_variable[6])
+        h,pad_var_f = utils.overlap_padding(h,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable = padding_variable[-1])
         if self. training :
             pad_var_f = None  
         padding_variable_out.append(pad_var_f)
