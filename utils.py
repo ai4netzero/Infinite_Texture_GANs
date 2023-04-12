@@ -829,18 +829,31 @@ def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init
     #exit()
     return grid
 
-def overlap_padding(input,pad_size =2,conv_red = 2,h=3,w = 3,padding_variable = None):
+def overlap_padding(input,pad_size =2,conv_red = 2,h=3,w = 3,padding_variable_v = None,padding_variable_h = None,):
         _,_,dx,dy = input.size()
         
         merged_input = merge_patches_2D(input,h = h,w = w,device = input.device)
-        pad_var_out = merged_input[:,:,:,[dx*(h-1)-1]]
-        if padding_variable is None:
+        pad_var_out_v = merged_input[:,:,:,[dx*(h-1)-1]]
+
+        if padding_variable_h is None and padding_variable_v is None:
             merged_input = F.pad(merged_input, (pad_size,pad_size,pad_size,pad_size), "replicate", 0) 
-        else:
+        elif padding_variable_h is None:
             #print(padding_variable.shape,merged_input.shape)
-            merged_input = torch.cat((padding_variable,merged_input),-1)
+            merged_input = torch.cat((padding_variable_v,merged_input),-1)
             merged_input = F.pad(merged_input, (0,pad_size,pad_size,pad_size), "replicate", 0) 
+        elif padding_variable_v is None:
+            merged_input = torch.cat((padding_variable_h,merged_input),-2)
+            merged_input = F.pad(merged_input, (pad_size,pad_size,0,pad_size), "replicate", 0) 
+        elif padding_variable_h is not None and padding_variable_v is not None:
+            merged_input = torch.cat((padding_variable_v,merged_input),-1)
+            merged_input = torch.cat((padding_variable_h,merged_input),-2) # extended
+            merged_input = F.pad(merged_input, (0,pad_size,0,pad_size), "replicate", 0) 
+
+        if padding_variable_h is None:
+            pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:dx*(h-1)]
+        else:
+            pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:dx*(h-1)]
 
         res_withpadd = dx +pad_size*conv_red
         padded_input = crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
-        return padded_input,pad_var_out
+        return padded_input,pad_var_out_v,pad_var_out_h
