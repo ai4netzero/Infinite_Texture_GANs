@@ -597,6 +597,76 @@ def scale_1D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
 
     return full_img
 
+def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'): 
+    
+    if h is None or w is None:
+        h = args.num_patches_h
+        w = args.num_patches_w
+        
+    steps_h = int(np.ceil(h/args.num_patches_h))
+    steps_w = int(np.ceil(w/args.num_patches_w))
+    # generate z
+    pad_size_z = 2
+    z_merged =  torch.randn(n_imgs,args.zdim,h*args.base_res+pad_size_z,w*args.base_res+pad_size_z).to(device)
+    res_withpadd_h = args.num_patches_h*args.base_res+pad_size_z
+    res_withpadd_w = args.num_patches_w*args.base_res+pad_size_z
+    z_local = crop_fun_(z_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*args.base_res,device = device)
+        
+
+
+    # generate maps
+    maps_local_per_res = []
+    pad_size_maps = 4
+    for i in range(0,args.n_layers_G):
+    
+        res1 = (2**i)*args.base_res
+        maps_merged =  torch.randn(n_imgs,args.n_cl,h*res1+pad_size_maps,w*res1+pad_size_maps).to(device)
+        res_withpadd_h = args.num_patches_h*res1+pad_size_maps
+        res_withpadd_w = args.num_patches_w*res1+pad_size_maps
+        maps_local = crop_fun_(maps_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res1,device = device)
+        maps_local_per_res.append(maps_local)
+    
+    gen_res = (2**(args.n_layers_G-1))*args.base_res
+    #print(maps_local.shape)
+
+    padding_variable_h,padding_variable_v = None
+    for j in range(maps_local.size(0)): # num of iteration through netG
+        # Get z
+        res_withpadd = args.base_res + pad_size_z
+        z = crop_fun_(z_local[[j]],res_withpadd,res_withpadd,args.base_res,device = device)
+        # Get map
+        maps_per_res = []
+        for i in range(0,args.n_layers_G):
+            res1 = (2**i)*args.base_res
+            res_withpadd = res1 + pad_size_maps
+            maps = crop_fun_(maps_local_per_res[i][[j]],res_withpadd,res_withpadd,res1,device = device)
+            maps_per_res.append(maps)
+            #print(maps.shape)
+        y_G = maps_per_res 
+        if j == maps_local.size(0)-1:
+            last = True
+        else:
+            last = False
+        with torch.no_grad():
+            fake,padding_variable_out_v,padding_variable_h = netG(z, y_G,args.num_patches_h,args.num_patches_w,padding_variable_h= padding_variable_h,padding_variable_v= padding_variable_v,last = last)
+            #print(fake.shape)
+        fake = fake.cpu() # (9,_,_,_)
+        
+        img_merged = merge_patches_2D(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
+        #torch.save(img_merged, str(j)+'img.pt')
+        #print(img_merged.shape)
+
+        if j != maps_local.size(0)-1: # last patch
+            img_merged = img_merged[:,:,:,0:gen_res*2]
+        
+        #print(img_merged.shape)
+
+        if j ==0:
+            full_img = img_merged
+        else:
+            full_img = torch.cat((full_img,img_merged),-1)
+
+    return full_img
 
 def random_sample_coord_grid(args,meta_grid,h=6, w= 6,n_imgs = 1):
 
@@ -829,11 +899,16 @@ def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init
     #exit()
     return grid
 
-def overlap_padding(input,pad_size =2,conv_red = 2,h=3,w = 3,padding_variable_v = None,padding_variable_h = None,):
+def overlap_padding(input,pad_size =2,conv_red = 2,h=3,w = 3,padding_variable_v = None,padding_variable_h = None,last = False):
         _,_,dx,dy = input.size()
         
         merged_input = merge_patches_2D(input,h = h,w = w,device = input.device)
         pad_var_out_v = merged_input[:,:,:,[dx*(h-1)-1]]
+        if last:
+            pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:]
+        else:
+            pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:dx*(h-1)]
+
 
         if padding_variable_h is None and padding_variable_v is None:
             merged_input = F.pad(merged_input, (pad_size,pad_size,pad_size,pad_size), "replicate", 0) 
@@ -842,17 +917,13 @@ def overlap_padding(input,pad_size =2,conv_red = 2,h=3,w = 3,padding_variable_v 
             merged_input = torch.cat((padding_variable_v,merged_input),-1)
             merged_input = F.pad(merged_input, (0,pad_size,pad_size,pad_size), "replicate", 0) 
         elif padding_variable_v is None:
-            merged_input = torch.cat((padding_variable_h,merged_input),-2)
             merged_input = F.pad(merged_input, (pad_size,pad_size,0,pad_size), "replicate", 0) 
+            merged_input = torch.cat((padding_variable_h,merged_input),-2)
+
         elif padding_variable_h is not None and padding_variable_v is not None:
             merged_input = torch.cat((padding_variable_v,merged_input),-1)
-            merged_input = torch.cat((padding_variable_h,merged_input),-2) # extended
             merged_input = F.pad(merged_input, (0,pad_size,0,pad_size), "replicate", 0) 
-
-        if padding_variable_h is None:
-            pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:dx*(h-1)]
-        else:
-            pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:dx*(h-1)]
+            merged_input = torch.cat((padding_variable_h,merged_input),-2) # extended
 
         res_withpadd = dx +pad_size*conv_red
         padded_input = crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)

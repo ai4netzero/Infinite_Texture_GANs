@@ -221,7 +221,7 @@ class ResBlockGenerator(nn.Module):
         else:
             return x
 
-    def forward(self, x,y=None,num_patches_h=None,num_patches_w=None,padding_variable=[None,None]):
+    def forward(self, x,y=None,num_patches_h=None,num_patches_w=None,padding_variable_h=[None,None],padding_variable_v=[None,None],last = False):
         if self.condnorm >0:
             out = self.activation(self.bn1(x,y))
         else:
@@ -230,7 +230,8 @@ class ResBlockGenerator(nn.Module):
         #if out.size(-1) == 4:
         #    print('sh')
         #    torch.save(out, 'out_before.pt')
-        out,pad_var_out1 = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable=padding_variable[0])
+        out,pad_var_out_v1,pad_var_out_h1 = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w
+                                                                  ,padding_variable_h=padding_variable_h[0],padding_variable_v=padding_variable_v[0],last = last)
         #if out.size(-1) == 6:
         #    torch.save(out, 'out_after.pt')
         
@@ -242,16 +243,17 @@ class ResBlockGenerator(nn.Module):
             out = self.activation(self.bn2(out))
 
 
-        out,pad_var_out2 = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w,padding_variable=padding_variable[1])
+        out,pad_var_out_v2,pad_var_out_h2 = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w
+                                                                  ,padding_variable_h=padding_variable_h[1],padding_variable_v=padding_variable_v[1],last = last)
         out = self.conv2(out)
         out_res = self.shortcut(x,y)
         out = out+out_res
         
         if self.training:
-            pad_var_out1 = pad_var_out2 =  None
+            pad_var_out_v1 =  pad_var_out_v2= pad_var_out_h1=pad_var_out_h2 =   None
                 
     
-        return out,pad_var_out1,pad_var_out2
+        return out,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2
 
 class ResBlockDiscriminator(nn.Module):
 
