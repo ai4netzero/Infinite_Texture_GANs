@@ -73,9 +73,12 @@ class Res_Generator(nn.Module):
             num_patches_h = self.num_patches_h
             num_patches_w = self.num_patches_w
             
-        if padding_variable is None:
-            padding_variable = [[None,None]]*self.n_layers_G
-            padding_variable.append(None)
+        if padding_variable_h is None:
+            padding_variable_h = [[None,None]]*self.n_layers_G
+            padding_variable_h.append([None])
+        if padding_variable_v is None:
+            padding_variable_v = [[None,None]]*self.n_layers_G
+            padding_variable_v.append([None])
 
         padding_variable_out_v = []
         padding_variable_out_h = []
@@ -92,18 +95,20 @@ class Res_Generator(nn.Module):
 
         
         h = self.up(h) 
-        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block2(h, y[1],num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                            ,padding_variable_h = padding_variable_h[1]
-                                            ,padding_variable_v = padding_variable_v[1]
-                                            ,last = last)
+        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block2(h, y[1]
+                                                                                    ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
+                                                                                    ,padding_variable_h = padding_variable_h[1]
+                                                                                    ,padding_variable_v = padding_variable_v[1]
+                                                                                    ,last = last)
         padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
         padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
         
         h = self.up(h) 
-        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block3(h, y[2],num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                            ,padding_variable_h = padding_variable_h[2]
-                                            ,padding_variable_v = padding_variable_v[2]
-                                            ,last = last)
+        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block3(h, y[2]
+                                                                                    ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
+                                                                                    ,padding_variable_h = padding_variable_h[2]
+                                                                                    ,padding_variable_v = padding_variable_v[2]
+                                                                                    ,last = last)
         padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
         padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
         
@@ -111,40 +116,43 @@ class Res_Generator(nn.Module):
             h = self.attention(h)
             
         h = self.up(h) 
-        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block4(h,y[3],num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                            ,padding_variable_h = padding_variable_h[3]
-                                            ,padding_variable_v = padding_variable_v[3]
-                                            ,last = last)
+        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block4(h,y[3]
+                                                                                    ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
+                                                                                    ,padding_variable_h = padding_variable_h[3]
+                                                                                    ,padding_variable_v = padding_variable_v[3]
+                                                                                    ,last = last)
         padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
         padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
         
         if self.n_layers_G >=5:
             h = self.up(h) 
-            h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block5(h,y[4],num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                            ,padding_variable_h = padding_variable_h[4]
-                                            ,padding_variable_v = padding_variable_v[4]
-                                            ,last = last)
+            h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block5(h,y[4]
+                                                                                        ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
+                                                                                        ,padding_variable_h = padding_variable_h[4]
+                                                                                        ,padding_variable_v = padding_variable_v[4]
+                                                                                        ,last = last)
             padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
             padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
             
         if self.n_layers_G == 6:
             h = self.up(h)
-            h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block6(h,y[5],num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                            ,padding_variable_h = padding_variable_h[5]
-                                            ,padding_variable_v = padding_variable_v[5]
-                                            ,last = last)
+            h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block6(h,y[5]
+                                                                                        ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
+                                                                                        ,padding_variable_h = padding_variable_h[5]
+                                                                                        ,padding_variable_v = padding_variable_v[5]
+                                                                                        ,last = last)
             padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
             padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
         
         h,pad_var_out_vf,pad_var_out_hf = utils.overlap_padding(h,pad_size = 1,h=num_patches_h,w=num_patches_w
-                                            ,padding_variable_h = padding_variable_h[-1]
-                                            ,padding_variable_v = padding_variable_v[-1]
+                                            ,padding_variable_h = padding_variable_h[-1][0]
+                                            ,padding_variable_v = padding_variable_v[-1][0]
                                             ,last = last)
         if self. training :
             pad_var_out_vf = pad_var_out_hf =  None  
         
-        padding_variable_out_v.append(pad_var_out_vf)
-        padding_variable_out_v.append(pad_var_out_hf)
+        padding_variable_out_v.append([pad_var_out_vf])
+        padding_variable_out_v.append([pad_var_out_hf])
         
         #h = self.bn(h)
         h = self.activation(h)

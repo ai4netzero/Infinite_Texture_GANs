@@ -605,6 +605,8 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
         
     steps_h = int(np.ceil(h/args.num_patches_h))
     steps_w = int(np.ceil(w/args.num_patches_w))
+    
+    
     # generate z
     pad_size_z = 2
     z_merged =  torch.randn(n_imgs,args.zdim,h*args.base_res+pad_size_z,w*args.base_res+pad_size_z).to(device)
@@ -629,42 +631,111 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
     gen_res = (2**(args.n_layers_G-1))*args.base_res
     #print(maps_local.shape)
 
-    padding_variable_h,padding_variable_v = None
-    for j in range(maps_local.size(0)): # num of iteration through netG
-        # Get z
-        res_withpadd = args.base_res + pad_size_z
-        z = crop_fun_(z_local[[j]],res_withpadd,res_withpadd,args.base_res,device = device)
-        # Get map
-        maps_per_res = []
-        for i in range(0,args.n_layers_G):
-            res1 = (2**i)*args.base_res
-            res_withpadd = res1 + pad_size_maps
-            maps = crop_fun_(maps_local_per_res[i][[j]],res_withpadd,res_withpadd,res1,device = device)
-            maps_per_res.append(maps)
-            #print(maps.shape)
-        y_G = maps_per_res 
-        if j == maps_local.size(0)-1:
-            last = True
-        else:
-            last = False
-        with torch.no_grad():
-            fake,padding_variable_out_v,padding_variable_h = netG(z, y_G,args.num_patches_h,args.num_patches_w,padding_variable_h= padding_variable_h,padding_variable_v= padding_variable_v,last = last)
-            #print(fake.shape)
-        fake = fake.cpu() # (9,_,_,_)
+    #padding_variable_h,padding_variable_v = None
+    #for j in range(maps_local.size(0)): # num of iteration through netG
+    
+    n = 0
+    padding_variable_v_in = None
+    padding_variable_v_out_row = None
+    full_img_row =None
+    for s_i in range(steps_h):
         
-        img_merged = merge_patches_2D(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
-        #torch.save(img_merged, str(j)+'img.pt')
-        #print(img_merged.shape)
-
-        if j != maps_local.size(0)-1: # last patch
-            img_merged = img_merged[:,:,:,0:gen_res*2]
+        padding_variable_h_in = None
         
-        #print(img_merged.shape)
+        # crop the padding_variable_v_out_row to form padding_variable_v_in
+        if padding_variable_v_out_row is not None:
+            padding_variable_v_in_row = [] # list of padding_variable_v_in for every iteration in steps_w
+            for ind_layer,layer_out in enumerate(padding_variable_v_out_row):
+                for ind_conv,conv_out in enumerate(layer_out):
+                    # replicate padding             
+                    padding_variable_v_out_row[ind_layer][ind_conv] = F.pad(padding_variable_v_out_row[ind_layer][ind_conv], (1,1,0,0), "replicate")
+                    #padding_variable_v_out_row[ind_layer][ind_conv] = padding_variable_v_out_row[ind_layer][ind_conv].to(device)
+                    i = max(ind_layer,args.n_layers_G-1)
+                    res = (2**i)*args.base_res
 
-        if j ==0:
-            full_img = img_merged
+                    res_withpadd_w = args.num_patches_w*res +2
+                    res_withpadd_h = args.num_patches_h*res +2
+                    padding_variable_v_out_conv = crop_fun_(padding_variable_v_out_row[ind_layer][ind_conv],res_withpadd_w,
+                                                                   res_withpadd_h,args.num_patches_w*res,device = device)
+                    for instance in padding_variable_v_out_conv:
+                        
+                    padding_variable_v_in_conv = padding_variable_v_out_row_cropped
+                    
+                    padding_variable_v_in_row.append(padding_variable_v_in_row) 
+
+        
+            
+            
+        for s_j in range(steps_w):
+            
+            
+            # Get z
+            res_withpadd = args.base_res + pad_size_z
+            z = crop_fun_(z_local[[n]],res_withpadd,res_withpadd,args.base_res,device = device)
+            
+            
+            # Get map
+            maps_per_res = []
+            for i in range(0,args.n_layers_G):
+                res1 = (2**i)*args.base_res
+                res_withpadd = res1 + pad_size_maps
+                maps = crop_fun_(maps_local_per_res[i][[n]],res_withpadd,res_withpadd,res1,device = device)
+                maps_per_res.append(maps)
+            y_G = maps_per_res 
+            
+            # check if the patch is the last one in the row
+            last = True if s_j == steps_w-1 else False
+            
+            if padding_variable_v_out_row is not None:
+                padding_variable_v_in = padding_variable_v_in_row[s_j]
+            
+            with torch.no_grad():
+                fake,padding_variable_v_out,padding_variable_h_out = netG(z, y_G,args.num_patches_h,args.num_patches_w
+                                                                    ,padding_variable_h= padding_variable_h_in,padding_variable_v= padding_variable_v_in
+                                                                    ,last = last)
+            
+            # for the next iteration padding_variable_h_in = padding_variable_h_out
+            padding_variable_h_in = padding_variable_h_out
+            
+            # concatenate the padding_variable_v_out to form padding_variable_v_out_row
+            if s_i == 0:
+                padding_variable_v_out_row = padding_variable_v_out
+            else:
+                for ind_layer,layer_out in enumerate(padding_variable_v_out):
+                    for ind_conv,conv_out in enumerate(layer_out):
+                        #padding_variable_v_out_row[ind_layer][ind_conv] = padding_variable_v_out_row[ind_layer][ind_conv].cpu()
+                        padding_variable_v_out_row[ind_layer][ind_conv] = torch.cat((padding_variable_v_out_row[ind_layer][ind_conv]
+                                                                                     ,conv_out),-1)
+                        
+            fake = fake.cpu() # (9,_,_,_)
+            
+            # concatenate the generated patches
+            img_merged = merge_patches_2D(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
+            #torch.save(img_merged, str(j)+'img.pt')
+            #print(img_merged.shape)
+
+            # drop the patched to be re-generated
+            
+            if s_j != steps_w-1 and s_i != steps_h-1: # not last in row or column
+                img_merged = img_merged[:,:,0:gen_res*(args.num_patches_h-1),0:gen_res*(args.num_patches_w-1)]
+            elif s_i != steps_h-1: # last column not last row
+                img_merged = img_merged[:,:,0:gen_res*(args.num_patches_h-1),:]
+            elif s_j != steps_w-1: # last row not last column
+                img_merged = img_merged[:,:,:,0:gen_res*(args.num_patches_w-1)]
+                
+
+            
+            if s_j ==0:
+                full_img_row = img_merged
+            else:
+                full_img_row = torch.cat((full_img_row,img_merged),-1)
+                
+            n = n+1
+        
+        if s_i == 0:
+            full_img = full_img_row
         else:
-            full_img = torch.cat((full_img,img_merged),-1)
+            full_img = torch.cat((full_img,full_img_row),-2)
 
     return full_img
 
