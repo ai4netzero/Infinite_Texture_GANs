@@ -635,36 +635,56 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
     #for j in range(maps_local.size(0)): # num of iteration through netG
     
     n = 0
-    padding_variable_v_in = None
-    padding_variable_v_out_row = None
+    padding_variable_h_in = None
+    padding_variable_h_out_row = None
+    padding_variable_h_in_row = None
     full_img_row =None
     for s_i in range(steps_h):
         
-        padding_variable_h_in = None
-        
-        # crop the padding_variable_v_out_row to form padding_variable_v_in
-        if padding_variable_v_out_row is not None:
-            padding_variable_v_in_row = [] # list of padding_variable_v_in for every iteration in steps_w
-            for ind_layer,layer_out in enumerate(padding_variable_v_out_row):
+        padding_variable_v_in = None
+        padding_variable_h_out_conv_all =[]
+        # crop the padding_variable_h_out_row to form padding_variable_h_in
+        if padding_variable_h_out_row is not None:
+            for ind_layer,layer_out in enumerate(padding_variable_h_out_row):
+                conv_list = []
                 for ind_conv,conv_out in enumerate(layer_out):
                     # replicate padding             
-                    padding_variable_v_out_row[ind_layer][ind_conv] = F.pad(padding_variable_v_out_row[ind_layer][ind_conv], (1,1,0,0), "replicate")
+                    padding_variable_h_out_row[ind_layer][ind_conv] = F.pad(padding_variable_h_out_row[ind_layer][ind_conv], (1,1,0,0), "replicate")
                     #padding_variable_v_out_row[ind_layer][ind_conv] = padding_variable_v_out_row[ind_layer][ind_conv].to(device)
-                    i = max(ind_layer,args.n_layers_G-1)
+                    i = min(ind_layer,args.n_layers_G-1)
                     res = (2**i)*args.base_res
 
                     res_withpadd_w = args.num_patches_w*res +2
-                    res_withpadd_h = args.num_patches_h*res +2
-                    padding_variable_v_out_conv = crop_fun_(padding_variable_v_out_row[ind_layer][ind_conv],res_withpadd_w,
-                                                                   res_withpadd_h,args.num_patches_w*res,device = device)
-                    for instance in padding_variable_v_out_conv:
-                        
-                    padding_variable_v_in_conv = padding_variable_v_out_row_cropped
-                    
-                    padding_variable_v_in_row.append(padding_variable_v_in_row) 
-
+                    res_withpadd_h = 1
+                    #print(res_withpadd_w)
+                    #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
+                    padding_variable_h_out_conv = crop_fun_(padding_variable_h_out_row[ind_layer][ind_conv],
+                                                                   res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res,device = device)
+                    #print(padding_variable_h_out_conv.shape)
+                    #for instance in padding_variable_v_out_conv:
+                    conv_list.append(padding_variable_h_out_conv)
+                padding_variable_h_out_conv_all.append(conv_list)
         
-            
+        
+            #print(padding_variable_h_out_conv.shape)            
+            N_patches = padding_variable_h_out_conv.shape[0]
+            #padding_variable_h_out_conv_all is a list of N_blocks = 7 each has N_patches instances of the same size
+            N_blocks = len(padding_variable_h_out_conv_all) 
+            #print(len(padding_variable_h_out_conv_all[0]))
+            #print(N_patches,N_blocks)
+            padding_variable_h_in_row = [] # list of padding_variable_h_in for every iteration in steps_w
+            for j in range(N_patches):
+                L1 = []
+                for i in range(N_blocks):
+                    conv_list = []
+                    #print(len(padding_variable_h_out_conv_all[i]))
+                    for l_i in padding_variable_h_out_conv_all[i]:
+                        conv_list.append(l_i[[j]])
+                    L1.append(conv_list)
+                padding_variable_h_in_row.append(L1)
+
+            #print(len(padding_variable_h_in_row[0][0]))
+            #print(padding_variable_h_in_row[0][0].shape)
             
         for s_j in range(steps_w):
             
@@ -686,26 +706,31 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
             # check if the patch is the last one in the row
             last = True if s_j == steps_w-1 else False
             
-            if padding_variable_v_out_row is not None:
-                padding_variable_v_in = padding_variable_v_in_row[s_j]
+            if padding_variable_h_in_row is not None:
+                #print(s_i,s_j)
+                padding_variable_h_in = padding_variable_h_in_row[s_j]
             
             with torch.no_grad():
                 fake,padding_variable_v_out,padding_variable_h_out = netG(z, y_G,args.num_patches_h,args.num_patches_w
                                                                     ,padding_variable_h= padding_variable_h_in,padding_variable_v= padding_variable_v_in
                                                                     ,last = last)
             
-            # for the next iteration padding_variable_h_in = padding_variable_h_out
-            padding_variable_h_in = padding_variable_h_out
+            # for the next iteration padding_variable_v_in = padding_variable_v_out
+            padding_variable_v_in = padding_variable_v_out
+            #print(len(padding_variable_v_in[0][0].shape))
             
-            # concatenate the padding_variable_v_out to form padding_variable_v_out_row
-            if s_i == 0:
-                padding_variable_v_out_row = padding_variable_v_out
+            # concatenate the padding_variable_h_out to form padding_variable_h_out_row
+            if s_j == 0:
+                padding_variable_h_out_row = padding_variable_h_out
             else:
-                for ind_layer,layer_out in enumerate(padding_variable_v_out):
+                for ind_layer,layer_out in enumerate(padding_variable_h_out):
                     for ind_conv,conv_out in enumerate(layer_out):
+                        #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
                         #padding_variable_v_out_row[ind_layer][ind_conv] = padding_variable_v_out_row[ind_layer][ind_conv].cpu()
-                        padding_variable_v_out_row[ind_layer][ind_conv] = torch.cat((padding_variable_v_out_row[ind_layer][ind_conv]
+                        padding_variable_h_out_row[ind_layer][ind_conv] = torch.cat((padding_variable_h_out_row[ind_layer][ind_conv]
                                                                                      ,conv_out),-1)
+                        #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
+
                         
             fake = fake.cpu() # (9,_,_,_)
             
@@ -988,8 +1013,12 @@ def overlap_padding(input,pad_size =2,conv_red = 2,h=3,w = 3,padding_variable_v 
             merged_input = torch.cat((padding_variable_v,merged_input),-1)
             merged_input = F.pad(merged_input, (0,pad_size,pad_size,pad_size), "replicate", 0) 
         elif padding_variable_v is None:
+            #print(merged_input.shape)
             merged_input = F.pad(merged_input, (pad_size,pad_size,0,pad_size), "replicate", 0) 
+            #print(merged_input.shape)
+            #print(padding_variable_h.shape)
             merged_input = torch.cat((padding_variable_h,merged_input),-2)
+            #print(merged_input.shape)
 
         elif padding_variable_h is not None and padding_variable_v is not None:
             merged_input = torch.cat((padding_variable_v,merged_input),-1)

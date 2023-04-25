@@ -152,7 +152,7 @@ class Res_Generator(nn.Module):
             pad_var_out_vf = pad_var_out_hf =  None  
         
         padding_variable_out_v.append([pad_var_out_vf])
-        padding_variable_out_v.append([pad_var_out_hf])
+        padding_variable_out_h.append([pad_var_out_hf])
         
         #h = self.bn(h)
         h = self.activation(h)

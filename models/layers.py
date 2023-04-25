@@ -230,6 +230,8 @@ class ResBlockGenerator(nn.Module):
         #if out.size(-1) == 4:
         #    print('sh')
         #    torch.save(out, 'out_before.pt')
+        #print(len(padding_variable_v),len(padding_variable_h))
+
         out,pad_var_out_v1,pad_var_out_h1 = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w
                                                                   ,padding_variable_h=padding_variable_h[0],padding_variable_v=padding_variable_v[0],last = last)
         #if out.size(-1) == 6:
