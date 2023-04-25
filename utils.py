@@ -603,10 +603,13 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
         h = args.num_patches_h
         w = args.num_patches_w
         
-    steps_h = int(np.ceil(h/args.num_patches_h))
-    steps_w = int(np.ceil(w/args.num_patches_w))
+    #steps_h = int(np.ceil(h/args.num_patches_h))
+    #steps_w = int(np.ceil(w/args.num_patches_w))
     
-    
+    # (h-1) should be mutiple of (num_patches_h-1)
+    steps_h = int((h-1)/(args.num_patches_h-1))
+    steps_w = int((w-1)/(args.num_patches_w-1))
+
     # generate z
     pad_size_z = 2
     z_merged =  torch.randn(n_imgs,args.zdim,h*args.base_res+pad_size_z,w*args.base_res+pad_size_z).to(device)
