@@ -2,6 +2,8 @@
 Infinite Generation of single texture images using patch-by-patch GAN
 
 
+![241](https://github.com/ai4netzero/Infinite_Texture_GANs/assets/48333146/d3716401-153e-4972-b6b4-998b746381a4)
+[241_7x21_ex.pdf](https://github.com/ai4netzero/Infinite_Texture_GANs/files/11818623/241_7x21_ex.pdf)
 
 This repository contains the codebase for the paper "Generating Infinite-Resolution Texture using GANs with Patch-by-Patch Paradigm" 
 The aim of this project is to generate high-quality texture patterns with infinite resolution using GANs.
