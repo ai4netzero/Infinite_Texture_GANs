@@ -37,7 +37,7 @@ nohup python train.py --data_path datasets/241.jpg --data single_image --samplin
 G_patch_2D --n_layers_G 6 --n_layers_D 4 --leak_G 0.02 --G_upsampling nearest --zdim 128 --base_res 4 --n_cl 1 --x_fake_GD --G_cond_method conv3x3 --num_patches_w 3 
 --num_patches_h 3   --batch_size 80 --random_crop 192 --epochs 600 --save_rate 50 --ema --smooth --dev_num 0 --ngpu 1 --fname ../Exps/wall_v2/241_run1 > ../Exps/logs/24_run1.out &
 ```
-Make sure to replace datasets/241.jpg with the path to your iamge. Adjust other paramters according to your requirements.
+Make sure to replace datasets/241.jpg with the path to your image. Adjust other paramters according to your requirements.
 
 
 ## Acknowledgements
