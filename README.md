@@ -5,7 +5,7 @@ This repository contains the codebase for the paper "Generating Infinite-Resolut
 The aim of this project is to generate high-quality texture patterns with infinite resolution using GANs.
 
 <p align="center">
-  <img width="400" height="300" src="https://github.com/ai4netzero/Infinite_Texture_GANs/blob/main/examples/241.jpg">
+  <img width="400" height="300" src="https://github.com/ai4netzero/Infinite_Texture_GANs/blob/main/examples/241_61x61.jpeg">
 </p>
 
 ![alt text](https://github.com/ai4netzero/Infinite_Texture_GANs/blob/main/examples/241_7x21.jpeg)
