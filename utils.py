@@ -679,7 +679,7 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
                     #print(res_withpadd_w)
                     #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
                     padding_variable_h_out_conv = crop_fun_(padding_variable_h_out_row[ind_layer][ind_conv],
-                                                                   res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res,device = device)
+                                                                   res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res,device = 'cpu')
                     #print(padding_variable_h_out_conv.shape)
                     #for instance in padding_variable_v_out_conv:
                     conv_list.append(padding_variable_h_out_conv)
@@ -729,6 +729,11 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
             if padding_variable_h_in_row is not None:
                 #print(s_i,s_j)
                 padding_variable_h_in = padding_variable_h_in_row[s_j]
+                
+                for ind_layer,layer_out in enumerate(padding_variable_h_in):
+                    for ind_conv,conv_out in enumerate(layer_out):
+                        padding_variable_h_in[ind_layer][ind_conv] = padding_variable_h_in[ind_layer][ind_conv].to(device)
+                    
             
             with torch.no_grad():
                 fake,padding_variable_v_out,padding_variable_h_out = netG(z, y_G,args.num_patches_h,args.num_patches_w
@@ -739,6 +744,15 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
             padding_variable_v_in = padding_variable_v_out
             #print(len(padding_variable_v_in[0][0].shape))
             
+            #padding_variable_h_out = padding_variable_h_out.cpu()
+            #torch.cuda.empty_cache()
+            
+            for ind_layer,layer_out in enumerate(padding_variable_h_out):
+                    for ind_conv,conv_out in enumerate(layer_out):
+                        padding_variable_h_out[ind_layer][ind_conv] = padding_variable_h_out[ind_layer][ind_conv].cpu()
+                        torch.cuda.empty_cache()
+
+            
             # concatenate the padding_variable_h_out to form padding_variable_h_out_row
             if s_j == 0:
                 padding_variable_h_out_row = padding_variable_h_out
@@ -748,11 +762,12 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
                         #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
                         #padding_variable_v_out_row[ind_layer][ind_conv] = padding_variable_v_out_row[ind_layer][ind_conv].cpu()
                         padding_variable_h_out_row[ind_layer][ind_conv] = torch.cat((padding_variable_h_out_row[ind_layer][ind_conv]
-                                                                                     ,conv_out),-1)
+                                                                                     ,conv_out.cpu()),-1)
                         #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
 
                         
             fake = fake.cpu() # (9,_,_,_)
+            torch.cuda.empty_cache()
             
             # concatenate the generated patches
             img_merged = merge_patches_2D(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
@@ -781,6 +796,10 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
             full_img = full_img_row
         else:
             full_img = torch.cat((full_img,full_img_row),-2)
+            
+    del padding_variable_h_in,padding_variable_v_in,padding_variable_v_out,padding_variable_h_out
+    
+    torch.cuda.empty_cache()
 
     return full_img
 
