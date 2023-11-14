@@ -35,9 +35,9 @@ datasets/
 To train the GANs model, run the following command:
 
 ```
-nohup python train.py --data_path datasets/241.jpg --data single_image --sampling 8000 --img_ch 3 --data_ext jpg --spec_norm_D --D_model patch_GAN --att --D_ch 64 --G_ch 52 --G_patch_2D --n_layers_G 6 --n_layers_D 4 --leak_G 0.02 --G_upsampling nearest --zdim 128 --base_res 4 --n_cl 1 --x_fake_GD --G_cond_method conv3x3 --num_patches_w 3 --num_patches_h 3   --batch_size 80 --random_crop 192 --epochs 600 --save_rate 50 --ema --smooth --dev_num 0 --ngpu 1 --fname ../Exps/wall_v2/241_run1 > ../Exps/logs/24_run1.out &
+nohup python train.py --data_path datasets/241.jpg --data single_image --sampling 8000 --img_ch 3 --data_ext jpg --spec_norm_D --D_model patch_GAN --att --D_ch 64 --G_ch 52 --G_patch_2D --n_layers_G 6 --n_layers_D 4 --leak_G 0.02 --G_upsampling nearest --zdim 128 --base_res 4 --n_cl 1 --x_fake_GD --G_cond_method conv3x3 --num_patches_w 3 --num_patches_h 3   --batch_size 80 --random_crop 192 --epochs 300 --save_rate 50 --ema --smooth --dev_num 0 --ngpu 1 --fname 241_run1 > 241_run1.out &
 ```
-Make sure to replace datasets/241.jpg with the path to your image. Adjust other paramters according to your requirements.
+Make sure to replace datasets/241.jpg with the path to your image. Adjust other paramters according to your requirements (e.g., you can try to reduce training time by smaller model capacity by setting --n_layers_G 5 --n_layers_D 3).
 
 
 ## Acknowledgements
