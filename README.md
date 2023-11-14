@@ -39,6 +39,7 @@ nohup python train.py --data_path datasets/241.jpg --data single_image --samplin
 ```
 Make sure to replace datasets/241.jpg with the path to your image. Adjust other paramters according to your requirements (e.g., you can try to reduce training time by smaller model capacity by setting --n_layers_G 5 --n_layers_D 3).
 
+After training you can use the example notebook "generate_example.ipynb" to generate large arbitrary size texture images using the saved model. 
 
 ## Acknowledgements
 Please cite the original paper if you use this code for your research
