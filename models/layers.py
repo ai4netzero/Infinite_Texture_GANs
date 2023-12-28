@@ -181,6 +181,7 @@ class ResBlockGenerator(nn.Module):
         self.type_norm = args.type_norm
         self.num_patches_h = args.num_patches_h
         self.num_patches_w = args.num_patches_w
+        self.args = args
         
         if G_cond_method is None:
             G_cond_method = args.G_cond_method
@@ -232,7 +233,7 @@ class ResBlockGenerator(nn.Module):
         #    torch.save(out, 'out_before.pt')
         #print(len(padding_variable_v),len(padding_variable_h))
 
-        out,pad_var_out_v1,pad_var_out_h1 = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w
+        out,pad_var_out_v1,pad_var_out_h1 = utils.local_padding(self.args,out,pad_size = 1
                                                                   ,padding_variable_h=padding_variable_h[0],padding_variable_v=padding_variable_v[0],last = last)
         #if out.size(-1) == 6:
         #    torch.save(out, 'out_after.pt')
@@ -245,7 +246,7 @@ class ResBlockGenerator(nn.Module):
             out = self.activation(self.bn2(out))
 
 
-        out,pad_var_out_v2,pad_var_out_h2 = utils.overlap_padding(out,pad_size = 1,h=num_patches_h,w=num_patches_w
+        out,pad_var_out_v2,pad_var_out_h2 = utils.local_padding(self.args,out,pad_size = 1
                                                                   ,padding_variable_h=padding_variable_h[1],padding_variable_v=padding_variable_v[1],last = last)
         out = self.conv2(out)
         out_res = self.shortcut(x,y)

@@ -148,22 +148,12 @@ def prepare_parser():
                         ,help ='num_patches_per_img')
     parser.add_argument('--G_patch_2D',default=False,action='store_true'
                        , help = 'Generate patches in 2D')
-    parser.add_argument('--num_patches_w', type=int, default=2
+    parser.add_argument('--num_patches_w', type=int, default=3
                         ,help ='num_patches_w')
-    parser.add_argument('--num_patches_h', type=int, default=2
+    parser.add_argument('--num_patches_h', type=int, default=3
                         ,help ='num_patches_h')                      
-    parser.add_argument('--coord_emb_dim', type=int, default=4
-                        ,help ='coord_emb_dim')   
-    parser.add_argument('--use_coord',default=False,action='store_true'
-                       , help = 'Use coordconv')
-    parser.add_argument('--period_coef',type=float, default=1.0
-                        ,help ='period_coef')
-    parser.add_argument('--num_neighbors',type=int, default=3
-                        ,help ='num_neighbors')
-    parser.add_argument('--meta_grid_h',type=int, default=30
-                        ,help ='height of meta map')
-    parser.add_argument('--meta_grid_w',type=int, default=30
-                        ,help ='width of meta map')
+    parser.add_argument('--outer_padding', type=str, default='replicate'
+                        ,help='padding used in the borders of the outer patches')
     # GPU settings
     parser.add_argument('--ngpu', type=int, default=1
                         ,help = 'number of gpus to be used')                                     
@@ -1034,36 +1024,58 @@ def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init
     #exit()
     return grid
 
-def overlap_padding(input,pad_size =2,conv_red = 2,h=3,w = 3,padding_variable_v = None,padding_variable_h = None,last = False):
-        _,_,dx,dy = input.size()
-        
-        merged_input = merge_patches_2D(input,h = h,w = w,device = input.device)
-        pad_var_out_v = merged_input[:,:,:,[dx*(h-1)-1]]
-        if last:
-            pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:]
-        else:
-            pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:dx*(h-1)]
+def local_padding(args,input,pad_size =2,conv_red = 2,padding_variable_v = None,padding_variable_h = None,last = False):
+    
+    """
+    Perform a local padding on the input data with the customizable parameters.
+
+    Parameters:
+    - input (Tensor): The input feature map on which the padding will be performed.
+    - pad_size (int): The size of padding to be applied. Default is 2.
+    - conv_red (int): The reduction of the size after convolution. Default is 2 for 3x3 conv.
+    - padding_variable_v (Variable): A vertical padding variable. Default is None.
+    - padding_variable_h (Variable): A horizontal padding variable. Default is None.
+    - last (bool): A flag indicating whether this is the last image in a row to be generated in a sequence. Default is False.
+
+    Returns:
+    - padded_input (Tensor): The input after local padding.
+    - pad_var_out_v (Tensor): The output vertical padding variable.
+    - pad_var_out_h (Tensor): The output horizontal padding variable.
+    """
+
+    h = args.num_patches_h
+    w = args.num_patches_w  
+    outer_padding = args.outer_padding      
+    _,_,dx,dy = input.size()
+    
+    
+    # merge patches together
+    merged_input = merge_patches_2D(input,h = h,w = w,device = input.device)
+    
+    
+    # get the last rows and columns to be used for the next generation step (if there is another step)
+    pad_var_out_v = merged_input[:,:,:,[dx*(h-1)-1]] # vertical slice
+    if last: 
+        pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:] 
+    else:
+        pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:dx*(h-1)]
 
 
-        if padding_variable_h is None and padding_variable_v is None:
-            merged_input = F.pad(merged_input, (pad_size,pad_size,pad_size,pad_size), "replicate", 0) 
-        elif padding_variable_h is None:
-            #print(padding_variable.shape,merged_input.shape)
-            merged_input = torch.cat((padding_variable_v,merged_input),-1)
-            merged_input = F.pad(merged_input, (0,pad_size,pad_size,pad_size), "replicate", 0) 
-        elif padding_variable_v is None:
-            #print(merged_input.shape)
-            merged_input = F.pad(merged_input, (pad_size,pad_size,0,pad_size), "replicate", 0) 
-            #print(merged_input.shape)
-            #print(padding_variable_h.shape)
-            merged_input = torch.cat((padding_variable_h,merged_input),-2)
-            #print(merged_input.shape)
+    # Perfrom outer padding manually depending on the iteration of the patches 
+    if padding_variable_h is None and padding_variable_v is None: # if thery are the first patches to be generated
+        merged_input = F.pad(merged_input, (pad_size,pad_size,pad_size,pad_size), outer_padding) 
+    elif padding_variable_h is None: # if thery are the intermediate patches to be generated in the first row
+        merged_input = torch.cat((padding_variable_v,merged_input),-1)
+        merged_input = F.pad(merged_input, (0,pad_size,pad_size,pad_size), outer_padding) 
+    elif padding_variable_v is None: # if thery are the final patches to be generated in the final rows
+        merged_input = F.pad(merged_input, (pad_size,pad_size,0,pad_size), outer_padding) 
+        merged_input = torch.cat((padding_variable_h,merged_input),-2)
+    elif padding_variable_h is not None and padding_variable_v is not None: # if thery are the intermediate patches to be generated in an intermediate row
+        merged_input = torch.cat((padding_variable_v,merged_input),-1)
+        merged_input = F.pad(merged_input, (0,pad_size,0,pad_size), outer_padding) 
+        merged_input = torch.cat((padding_variable_h,merged_input),-2) # extended
 
-        elif padding_variable_h is not None and padding_variable_v is not None:
-            merged_input = torch.cat((padding_variable_v,merged_input),-1)
-            merged_input = F.pad(merged_input, (0,pad_size,0,pad_size), "replicate", 0) 
-            merged_input = torch.cat((padding_variable_h,merged_input),-2) # extended
-
-        res_withpadd = dx +pad_size*conv_red
-        padded_input = crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
-        return padded_input,pad_var_out_v,pad_var_out_h
+    # perform cropping after padding is done to get the patches back
+    res_withpadd = dx +pad_size*conv_red
+    padded_input = crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
+    return padded_input,pad_var_out_v,pad_var_out_h

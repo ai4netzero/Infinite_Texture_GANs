@@ -150,14 +150,6 @@ TIME_LIMIT = args.limit
 start_time = time.time()
 
 
-if args.use_coord:
-    args.img_res = (2**netG.n_layers_G) * args.base_res
-    meta_coord_grid = create_coord_gird(args.meta_grid_h* args.img_res,args.meta_grid_w* args.img_res,coef = args.period_coef)
-else:
-    meta_coord_grid = None      
-
-
-
 def train(num_epochs=1, disc_iters=1):
     global G_losses, D_losses
     

@@ -28,6 +28,7 @@ class Res_Generator(nn.Module):
         self.upsampling_mode = args.G_upsampling
         self.num_patches_h = args.num_patches_h
         self.num_patches_w = args.num_patches_w
+        self.args = args
 
         #
 
@@ -144,7 +145,7 @@ class Res_Generator(nn.Module):
             padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
             padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
         
-        h,pad_var_out_vf,pad_var_out_hf = utils.overlap_padding(h,pad_size = 1,h=num_patches_h,w=num_patches_w
+        h,pad_var_out_vf,pad_var_out_hf = utils.local_padding(args=self.args,input=h,pad_size = 1
                                             ,padding_variable_h = padding_variable_h[-1][0]
                                             ,padding_variable_v = padding_variable_v[-1][0]
                                             ,last = last)
