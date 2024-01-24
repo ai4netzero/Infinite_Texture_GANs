@@ -295,11 +295,11 @@ def sample_from_gen_PatchByPatch(netG,z_dim=128,base_res=4,map_dim = 4,num_image
         else:
             maps_per_layers = [None]*n_layers_G
         
-        # During training set the padding variable in to None for all layers in the generator
+        # During training set the input padding variable to None for all layers in the generator
         if netG.training:
             padding_variable_in = [None]*(n_layers_G+2)
 
-        fake_images_patches,_ = netG.forward(z, maps_per_layers,padding_variable_in,padding_location = None)
+        fake_images_patches,_ = netG(z, maps_per_layers,padding_variable_in,padding_location = None)
         
         fake_images = merge_patches_into_image(fake_images_patches,num_patches_height,num_patches_width,device)
         

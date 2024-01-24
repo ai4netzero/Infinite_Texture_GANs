@@ -83,34 +83,26 @@ class ResidualPatchGenerator(nn.Module):
             
         if self.attention:
             self.attention = Attention(self.base_ch*2,SN=SN)
-
-            
+    
         self.final = conv2d_lp(final_chin,self.img_ch,self.local_padder)
         
 
     def forward(self, z,maps=None,padding_variable_in= None,padding_location = None):
             
-        #print(z.shape)
         h,pad_var_start = self.start(z,padding_variable_in[0],padding_location)
         
-        #print(h.shape)
-        #exit()
-
         h,pad_var_block1 = self.block1(h,maps[0],padding_variable_in[1],padding_location)
-       
+        
         h = self.up(h) # 2x
-        
         h,pad_var_block2 = self.block2(h, maps[1],padding_variable_in[2],padding_location)
-                
-        h = self.up(h) # 4x
         
+        h = self.up(h) # 4x
         h,pad_var_block3 = self.block3(h, maps[2],padding_variable_in[3],padding_location)
-
+        
         if self.attention:
             h = self.attention(h)
             
         h = self.up(h) # 8x
-        
         h,pad_var_block4 = self.block4(h, maps[3],padding_variable_in[4],padding_location)
         
         # Form the output padding variable to be used for the next iteration during inference 
