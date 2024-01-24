@@ -11,10 +11,6 @@ import numpy as np
 from models.generators import ResidualPatchGenerator
 from models.discriminators import Patch_Discriminator
 
-
-
-
-
 def prepare_parser():
     parser = argparse.ArgumentParser()
                   
@@ -145,8 +141,6 @@ def prepare_device(args):
         device = torch.device("cuda:"+str(args.dev_num)) 
     return device
 
-
-
 def prepare_seed(args):
     #Seeds
     if args.seed is None:
@@ -210,35 +204,7 @@ def prepare_models(args,device = 'cpu'):
                                     ,SN= args.spec_norm_D,norm_layer = args.norm_layer_D).to(device)
     return netG,netD
 
-def load_from_saved(args,netG,netD,optimizerG,optimizerD):
-    checkpoint = torch.load(args.saved_cp)
-    #load G
-    state_dict_G = checkpoint['netG_state_dict']
-    new_state_dict_G = OrderedDict()
-    for k, v in state_dict_G.items():
-        if 'module' in k:
-            k = k.replace('module.','')
-        new_state_dict_G[k] = v
-    netG.load_state_dict(new_state_dict_G)
-    
-    #Load D
-    state_dict_D = checkpoint['netD_state_dict']
-    new_state_dict_D = OrderedDict()
-    for k, v in state_dict_D.items():
-        if 'module' in k:
-            k = k.replace('module.','')
-        new_state_dict_D[k] = v
-    netD.load_state_dict(new_state_dict_D)
-    #load optimizer
-    optimizerG.load_state_dict(checkpoint['optimizerG_state_dict'])
-    optimizerD.load_state_dict(checkpoint['optimizerD_state_dict'])
 
-    st_epoch = checkpoint['epoch']+1
-    G_losses = checkpoint['Gloss']
-    D_losses = checkpoint['Dloss']
-    #args = checkpoint['args']
-    return netG,netD,optimizerG,optimizerD,st_epoch,G_losses,D_losses
-    
 def prepare_filename(args):
     filename = str(args.epochs) + "_"
 
@@ -296,8 +262,8 @@ def sample_from_gen_PatchByPatch(netG,z_dim=128,base_res=4,map_dim = 4,num_image
             maps_per_layers = [None]*n_layers_G
         
         # During training set the input padding variable to None for all layers in the generator
-        if netG.training:
-            padding_variable_in = [None]*(n_layers_G+2)
+        #if netG.training:
+        padding_variable_in = [None]*(n_layers_G+2)
 
         fake_images_patches,_ = netG(z, maps_per_layers,padding_variable_in,padding_location = None)
         

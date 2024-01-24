@@ -1,8 +1,6 @@
 import torch.nn as nn
-import torch
 from models.layers import LocalPadder,Attention,conv2d_lp,ResBlockGenerator
 #from utils import crop_images,merge_patches_into_image
-import utils
 
 class ResidualPatchGenerator(nn.Module):
     """
@@ -18,14 +16,14 @@ class ResidualPatchGenerator(nn.Module):
             leak (float): Leaky ReLU negative slope (default is 0).
             SN (bool): Whether to use spectral normalization (default is False).
             padding_mode (str): Padding mode for convolution layers (default is 'local').
-            outer_padding (str): Padding mode for outer patches (default is 'zeros').
+            outer_padding (str): Padding mode for outer patches (default is 'constant' for zero padding).
             num_patches_h (int): Number of patches along the height dimension (default is 3).
             num_patches_w (int): Number of patches along the width dimension (default is 3).
         """
     
     def __init__(self,z_dim = 128,G_ch = 64,base_res=4,n_layers_G = 4,attention=True,img_ch= 3
                  ,leak = 0,SN = False,type_norm = 'BN',map_dim = 1,
-                 padding_mode = 'local',outer_padding = 'zeros',
+                 padding_mode = 'local',outer_padding = 'constant',
                  num_patches_h = 3,num_patches_w=3,padding_size = 1,conv_reduction = 2):
         
         super(ResidualPatchGenerator, self).__init__()
