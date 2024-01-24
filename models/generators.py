@@ -1,199 +1,145 @@
 import torch.nn as nn
-import sys
-import torch.nn.utils.spectral_norm as SpectralNorm
-import numpy as np
 import torch
-import torch.nn.functional as F
-from models.layers import *
-
-#from utils import *
+from models.layers import LocalPadder,Attention,conv2d_lp,ResBlockGenerator
+#from utils import crop_images,merge_patches_into_image
 import utils
+
+class ResidualPatchGenerator(nn.Module):
+    """
+        PyTorch implementation of a Residual Patch Generator.
+
+        Args:
+            z_dim (int): Dimension of the input latent vector (default is 128).
+            G_ch (int): Number of channels in the generator's first layer (default is 64).
+            base_res (int): Resolution at the first layer (default is 4).
+            n_layers_G (int): Number of layers in the generator (default is 4).
+            att (bool): Whether to use attention module in the generator (default is True).
+            img_ch (int): Number of channels in the generated image (default is 3 for RGB).
+            leak (float): Leaky ReLU negative slope (default is 0).
+            SN (bool): Whether to use spectral normalization (default is False).
+            padding_mode (str): Padding mode for convolution layers (default is 'local').
+            outer_padding (str): Padding mode for outer patches (default is 'zeros').
+            num_patches_h (int): Number of patches along the height dimension (default is 3).
+            num_patches_w (int): Number of patches along the width dimension (default is 3).
+        """
+    
+    def __init__(self,z_dim = 128,G_ch = 64,base_res=4,n_layers_G = 4,attention=True,img_ch= 3
+                 ,leak = 0,SN = False,type_norm = 'BN',map_dim = 1,
+                 padding_mode = 'local',outer_padding = 'zeros',
+                 num_patches_h = 3,num_patches_w=3,padding_size = 1,conv_reduction = 2):
         
+        super(ResidualPatchGenerator, self).__init__()
 
-class Res_Generator(nn.Module):
-    def __init__(self,args,n_classes = 0):
-        super(Res_Generator, self).__init__()
+        self.z_dim = z_dim
+        self.base_ch = G_ch
+        self.base_res =  base_res
+        self.n_layers_G = n_layers_G
+        self.attention = attention
+        self.img_ch = img_ch        
+        self.leak  =  leak
+        self.SN  =  SN
+        self.type_norm = type_norm
+        self.map_dim = map_dim
+        self.padding_mode = padding_mode
+        self.outer_padding = outer_padding
+        self.num_patches_h = num_patches_h
+        self.num_patches_w = num_patches_w
+        self.padding_size = padding_size
+        self.conv_reduction = conv_reduction
+        
+        if self.padding_mode == 'local':
+            self.local_padder = LocalPadder(num_patches_h =num_patches_h ,num_patches_w=num_patches_w,outer_padding = outer_padding
+                                            ,padding_size = padding_size,conv_reduction = conv_reduction)
+        else:
+            self.local_padder = None
 
-        self.z_dim = args.zdim
-        self.base_ch = args.G_ch
-        self.n_classes = n_classes
-        self.att = args.att
-        self.cond_method = cond_method = args.G_cond_method
-        self.n_layers_G =n_layers_G= args.n_layers_G
-        self.base_res =base_res =  args.base_res
-        self.img_ch = args.img_ch
-        self.leak = leak =  args.leak_G
-        self.SN =SN =  args.spec_norm_G
-        self.padding_mode = args.G_padding
-        self.upsampling_mode = args.G_upsampling
-        self.num_patches_h = args.num_patches_h
-        self.num_patches_w = args.num_patches_w
-        self.args = args
-
-        #
-
-        self.up = nn.Upsample(scale_factor=2,mode = args.G_upsampling)
-
-        if self.cond_method == 'concat':
-            self.z_dim = self.z_dim+n_classes
-            n_classes = 0
+        self.up = nn.Upsample(scale_factor=2,mode = 'nearest')
 
         if self.leak >0:
             self.activation = nn.LeakyReLU(self.leak)
         else:
             self.activation = nn.ReLU()  
         
-        #self.dense = Linear(self.z_dim, base_res * base_res * self.base_ch*8,SN=SN)
-        self.start = conv3x3(self.z_dim,self.base_ch*8,SN = SN,padding_mode=self.padding_mode,p=0).apply(init_weight)
+        self.start = conv2d_lp(self.z_dim,self.base_ch*8,self.local_padder)
         
-        self.block1 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*8,n_classes = n_classes,G_cond_method = 'conv3x3')
-        self.block2 = ResBlockGenerator(args,self.base_ch*8, self.base_ch*4,n_classes = n_classes,G_cond_method = 'conv3x3')
-        self.block3 = ResBlockGenerator(args,self.base_ch*4, self.base_ch*2,n_classes = n_classes,G_cond_method = 'conv3x3')
-        if self.att:
-            self.attention = Attention(self.base_ch*2,SN=SN)
-        self.block4 = ResBlockGenerator(args,self.base_ch*2, self.base_ch,n_classes = n_classes,G_cond_method = 'conv3x3')
-        if n_layers_G>=5:
+        self.block1 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*8)
+        self.block2 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*4)
+        self.block3 = ResBlockGenerator(self,self.base_ch*4, self.base_ch*2)
+        self.block4 = ResBlockGenerator(self,self.base_ch*2, self.base_ch)   
+             
+        # To generate sizes of 16x the base_res 
+        if self.n_layers_G>=5:
             final_chin = self.base_ch//2
-            self.block5 = ResBlockGenerator(args,self.base_ch, self.base_ch//2,n_classes = n_classes,G_cond_method = 'conv3x3')
-            if n_layers_G == 6:
+            self.block5 = ResBlockGenerator(self,self.base_ch, self.base_ch//2)
+            # To generate sizes of 32x the base_res 
+            if self.n_layers_G == 6:
                 final_chin = self.base_ch//4
-                self.block6 = ResBlockGenerator(args,self.base_ch//2, self.base_ch//4,n_classes = n_classes,G_cond_method = 'conv3x3')
+                self.block6 = ResBlockGenerator(self,self.base_ch//2, self.base_ch//4)
         else:
             final_chin = self.base_ch
-        #self.bn = nn.BatchNorm2d(final_chin)
 
-        self.final = conv3x3(final_chin,self.img_ch,SN = SN,padding_mode=self.padding_mode,p=0).apply(init_weight)
-        
-
-
-    def forward(self, z,y=None,num_patches_h=None,num_patches_w=None,padding_variable_h= None,padding_variable_v= None,last = False):
-        if self.cond_method =='concat':
-            z = torch.cat((z,y),1)
-            y = None
-        if num_patches_h is None or num_patches_w is None:
-            num_patches_h = self.num_patches_h
-            num_patches_w = self.num_patches_w
+        if self.type_norm == 'BN':
+            self.bn = nn.BatchNorm2d(final_chin)
             
-        if padding_variable_h is None:
-            padding_variable_h = [[None,None]]*self.n_layers_G
-            padding_variable_h.append([None])
-        if padding_variable_v is None:
-            padding_variable_v = [[None,None]]*self.n_layers_G
-            padding_variable_v.append([None])
+        if self.attention:
+            self.attention = Attention(self.base_ch*2,SN=SN)
 
-        padding_variable_out_v = []
-        padding_variable_out_h = []
+            
+        self.final = conv2d_lp(final_chin,self.img_ch,self.local_padder)
+        
 
-        h = self.start(z)
-        #print(padding_variable)
-        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block1(h,y[0]
-                                            ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                            ,padding_variable_h = padding_variable_h[0]
-                                            ,padding_variable_v = padding_variable_v[0]
-                                            ,last = last)
-        padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
-        padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
+    def forward(self, z,maps=None,padding_variable_in= None,padding_location = None):
+            
+        #print(z.shape)
+        h,pad_var_start = self.start(z,padding_variable_in[0],padding_location)
+        
+        #print(h.shape)
+        #exit()
 
+        h,pad_var_block1 = self.block1(h,maps[0],padding_variable_in[1],padding_location)
+       
+        h = self.up(h) # 2x
         
-        h = self.up(h) 
-        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block2(h, y[1]
-                                                                                    ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                                                                    ,padding_variable_h = padding_variable_h[1]
-                                                                                    ,padding_variable_v = padding_variable_v[1]
-                                                                                    ,last = last)
-        padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
-        padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
+        h,pad_var_block2 = self.block2(h, maps[1],padding_variable_in[2],padding_location)
+                
+        h = self.up(h) # 4x
         
-        h = self.up(h) 
-        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block3(h, y[2]
-                                                                                    ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                                                                    ,padding_variable_h = padding_variable_h[2]
-                                                                                    ,padding_variable_v = padding_variable_v[2]
-                                                                                    ,last = last)
-        padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
-        padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
-        
-        if self.att:
+        h,pad_var_block3 = self.block3(h, maps[2],padding_variable_in[3],padding_location)
+
+        if self.attention:
             h = self.attention(h)
             
-        h = self.up(h) 
-        h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block4(h,y[3]
-                                                                                    ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                                                                    ,padding_variable_h = padding_variable_h[3]
-                                                                                    ,padding_variable_v = padding_variable_v[3]
-                                                                                    ,last = last)
-        padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
-        padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
+        h = self.up(h) # 8x
+        
+        h,pad_var_block4 = self.block4(h, maps[3],padding_variable_in[4],padding_location)
+        
+        # Form the output padding variable to be used for the next iteration during inference 
+        padding_variable_out = [pad_var_start,pad_var_block1,pad_var_block2,pad_var_block3,pad_var_block4]
         
         if self.n_layers_G >=5:
-            h = self.up(h) 
-            h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block5(h,y[4]
-                                                                                        ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                                                                        ,padding_variable_h = padding_variable_h[4]
-                                                                                        ,padding_variable_v = padding_variable_v[4]
-                                                                                        ,last = last)
-            padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
-            padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
-            
+            h = self.up(h) # 16x
+            h,pad_var_block5 = self.block5(h, maps[4],padding_variable_in[5],padding_location)
+            padding_variable_out.append(pad_var_block5)
         if self.n_layers_G == 6:
-            h = self.up(h)
-            h,pad_var_out_v1,pad_var_out_h1,pad_var_out_v2,pad_var_out_h2 = self.block6(h,y[5]
-                                                                                        ,num_patches_h=num_patches_h,num_patches_w=num_patches_w
-                                                                                        ,padding_variable_h = padding_variable_h[5]
-                                                                                        ,padding_variable_v = padding_variable_v[5]
-                                                                                        ,last = last)
-            padding_variable_out_v.append([pad_var_out_v1,pad_var_out_v2])
-            padding_variable_out_h.append([pad_var_out_h1,pad_var_out_h2])
-        
-        h,pad_var_out_vf,pad_var_out_hf = utils.local_padding(args=self.args,input=h,pad_size = 1
-                                            ,padding_variable_h = padding_variable_h[-1][0]
-                                            ,padding_variable_v = padding_variable_v[-1][0]
-                                            ,last = last)
-        if self. training :
-            pad_var_out_vf = pad_var_out_hf =  None  
-        
-        padding_variable_out_v.append([pad_var_out_vf])
-        padding_variable_out_h.append([pad_var_out_hf])
-        
-        #h = self.bn(h)
+            h = self.up(h) # 32x
+            h,pad_var_block6 = self.block6(h, maps[5],padding_variable_in[6],padding_location)
+            padding_variable_out.append(pad_var_block6)
+
+        if self.type_norm == 'bn':
+            h = self.bn(h)
+            
         h = self.activation(h)
-        h = self.final(h)
-        img = nn.Tanh()(h)
+        
+        h,pad_var_final = self.final(h)
+        padding_variable_out.append(pad_var_final)
+        
+        out = nn.Tanh()(h)
         
         if self.training:
-            return img
+            return out, None
         else:
-            return img, padding_variable_out_v,padding_variable_out_h
+            return out, padding_variable_out
 
-class DC_Generator(nn.Module): # papers DCGAN or SNGAN
-    def __init__(self,z_dim=128,img_ch=3,base_ch = 64,n_layers=4):
-        super(DC_Generator, self).__init__()
-        self.z_dim = z_dim
+    #def forwar()
 
-        sequence = [nn.ConvTranspose2d(z_dim, self.base_ch*8, 4, stride=1, bias=False),  # 4x4 (dense)
-        nn.BatchNorm2d(self.base_ch*8),
-        nn.ReLU()]
-
-        ch_in = self.base_ch*8
-        for n in range(0, n_layers):
-            ch_out = ch_in//2
-            sequence += [nn.ConvTranspose2d(ch_in, ch_out, 4, stride=2, padding=(1, 1), bias=False),
-                            nn.BatchNorm2d(ch_out),
-                            nn.ReLU()]
-            ch_in = ch_out
-
-        sequence +=[nn.ConvTranspose2d(ch_out, img_ch, 3, stride=1, padding=(1, 1)),  # 1x (conv)
-                nn.Tanh()]
-
-        self.model =  nn.Sequential(*sequence)
-
-
-    def forward(self, input,y = None):
-        return self.model(input.view(-1,self.z_dim, 1, 1))
-
-
-# Testing architecture
-'''
-noise = torch.randn(1, 128)
-fake = G(noise)
-print(fake.size())'''
+    

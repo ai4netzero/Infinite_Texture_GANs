@@ -1,10 +1,7 @@
 import torch.nn as nn
-import sys
 import torch.nn.utils.spectral_norm as SpectralNorm
-import numpy as np
 import torch
-import torch.nn.functional as F
-from models.layers import *
+from models.layers import OptimizedBlock,Attention,Linear,ResBlockDiscriminator,conv1x1,conv3x3,conv4x4
         
 
 
@@ -157,6 +154,20 @@ class SN_Discriminator(nn.Module): # paper SNGAN
 
 # paper pix2pix,sinGAN(batchnorm), SPADE,pix2pixHD(instancenorm)
 class Patch_Discriminator(nn.Module):
+    
+    """PatchGAN discriminator that classifies patches of the image instead of the whole input image.
+
+    The discriminator is used in pix2pix, sinGAN(batchnorm), SPADE, pix2pixHD(instancenorm).
+
+    Args:
+        img_ch (int): Channel number of inputs.
+        base_ch (int): Base channels of the network layer.
+        n_layers_D (int): Number of the discriminator layers . Default: 4
+        kw (int): Kernel width. Defaults: 4
+        SN (int): Apply spectral normalization to the network weights. Default: 32.
+        norm_layer(str): The type of normalization layer used in the network: (batch,instance, None). Default: None
+    """
+    
     def __init__(self, img_ch=1,base_ch = 64,n_layers_D=4,kw = 4,SN= False,norm_layer = None):
         super(Patch_Discriminator, self).__init__()   
         nf = base_ch
@@ -191,11 +202,10 @@ class Patch_Discriminator(nn.Module):
                             nn.LeakyReLU(0.2, False)
                             ]                
 
-        #sequence += [SpectralNorm(nn.Conv2d(nf, 1, kernel_size=kw, stride=1, padding=padw,bias = True))]
         sequence += [conv_fun(nf, 1,s = 1, SN=SN,bias = True)]
 
         self.model = nn.Sequential(*sequence)
-    def forward(self, x,y=None):
-        h = x    
-        out = self.model(h)
+        
+    def forward(self, x):
+        out = self.model(x)
         return out

@@ -1,30 +1,17 @@
-import matplotlib.pyplot as plt
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
-from torchvision import datasets, transforms
-from torchvision.utils import save_image, make_grid
-import torchvision
-import xml.etree.ElementTree as ET
-from tqdm import tqdm_notebook as tqdm
 import time
 import argparse
 from collections import OrderedDict
 import os
 import random
-import torch
 import torch.nn as nn
-import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torch.optim as optim
 import torch.utils.data
-import torchvision.datasets as dset
-import torchvision.utils as vutils
 import numpy as np
-import cv2
-import matplotlib.animation as animation
-from IPython.display import HTML
-import sys
-from models import generators,discriminators
+
+from models.generators import ResidualPatchGenerator
+from models.discriminators import Patch_Discriminator
+
+
 
 
 
@@ -32,70 +19,58 @@ def prepare_parser():
     parser = argparse.ArgumentParser()
                   
     # data settings     
-    parser.add_argument('--data', type=str, default='channels'
+    parser.add_argument('--data', type=str, default='single_image'
                        ,help = 'type of data')
-    parser.add_argument('--data_path', type=str, default='datasets/prop_channels_train/'
+    parser.add_argument('--data_path', type=str, default='datasets/241.jpg'
                        ,help = 'data path')
-    parser.add_argument('--csv_path', type=str, default= None
-                       ,help = 'csv path')
-    parser.add_argument('--data_ext', type=str, default='txt'
+    parser.add_argument('--data_ext', type=str, default='jpg'
                        ,help = 'data extension txt, png')
     parser.add_argument('--center_crop', type=int, default=None
                        ,help = 'center cropping')
     parser.add_argument('--random_crop', type=int, default=None
                        ,help = 'random cropping')
-    parser.add_argument('--random_crop_h', type=int, default=None
-                       ,help = 'random cropping for h ')
-    parser.add_argument('--random_crop_w', type=int, default=None
-                       ,help = 'random cropping for w')
     parser.add_argument('--resize_h', type=int, default=None
                        ,help = 'resize for h ')
     parser.add_argument('--resize_w', type=int, default=None
-                       ,help = 'resize for w')                                                        
-                        
+                       ,help = 'resize for w')                                                                          
     parser.add_argument('--sampling', type=int, default=None
                        ,help = 'randomly sample --sampling instances from the training data if not None')
+    
     # models settings
-    parser.add_argument('--G_model', type=str, default='residual_GAN'
-                        ,help = 'Generator Model can be residual_GAN, dcgan, ...')
-    parser.add_argument('--D_model', type=str, default='residual_GAN'
-                        ,help = 'Discriminator Model can be residual_GAN, dcgan, sngan,...')
-    parser.add_argument('--cgan',action='store_true',default=False
-                        ,help = 'Use conditional GAN if True (only implmented in residual_GAN)')
-    parser.add_argument('--att',action='store_true',default=False
-                        ,help = 'Use Attention if True  (only implmented in residual_GAN)')
+    parser.add_argument('--D_model', type=str, default='patch_GAN'
+                        ,help = 'Discriminator Model can be residual_GAN, dcgan, sngan or patch_GAN')
+    parser.add_argument('--attention',action='store_true',default=False
+                        ,help = 'Use Attention in the generator if True  (only implmented in residual_GAN)')
     parser.add_argument('--img_ch', type=int, default=3
                         ,help = 'the number of image channels 1 for grayscale 3 for RGB')
     parser.add_argument('--G_ch', type=int, default=52
                         ,help = 'base multiplier for the Generator (for cnn_GAN should be large 512/1024) , (for ')
-    parser.add_argument('--D_ch', type=int, default=32
+    parser.add_argument('--D_ch', type=int, default=64
                         ,help = 'base multiplier for the discriminator')
     parser.add_argument('--leak_G', type=float, default=0
                         ,help = 'use leaky relu activation for generator with leak= leak_G,zero value will use RELU')
     parser.add_argument('--leak_D', type=float, default=0
                         ,help = 'use leaky relu activation for discriminator with leak= leak_G,zero value will use RELU')
-    parser.add_argument('--zdim', type=int, default=128
-                        ,help ='dimenstion of latent vector')
+    parser.add_argument('--z_dim', type=int, default=128
+                        ,help ='dimenstion of the latent input')
+    parser.add_argument('--map_dim', type=int, default=1
+                        ,help ='dimenstion of the modulation map if SSM is used')
     parser.add_argument('--spec_norm_D', default=False,action='store_true'
                        ,help = 'apply spectral normalization in discriminator')
     parser.add_argument('--spec_norm_G', default=False,action='store_true'
                        ,help = 'apply spectral normalization in generator')
-    parser.add_argument('--n_layers_D', type=int, default=3
+    parser.add_argument('--n_layers_D', type=int, default=4
                        ,help = 'number of layers used in discriminator of dcgan,patchGAN')
-    parser.add_argument('--n_layers_G', type=int, default=4
+    parser.add_argument('--n_layers_G', type=int, default=6
                        ,help = 'number of layers used in generator') 
     parser.add_argument('--norm_layer_D', type=str, default=None
                        ,help = 'normalization layer in patchGAN')
     parser.add_argument('--base_res', type=int, default=4
                        ,help = 'base resolution for G') 
-    parser.add_argument('--G_padding', type=str, default='zeros'
-                       ,help = 'padding used in G')
-    parser.add_argument('--G_upsampling', type=str, default='nearest'
-                       ,help = 'upsampling mode used in G')
-    parser.add_argument('--spade_upsampling', type=str, default='nearest'
-                       ,help = 'type of upsampling mode used in spade')
-    parser.add_argument('--type_norm', type=str, default='bn'
-                       ,help = 'type_norm used in G')
+    parser.add_argument('--padding_mode', type=str, default='zeros'
+                       ,help = 'padding used in G either zeros or local')
+    parser.add_argument('--type_norm_G', type=str, default='BN'
+                       ,help = 'type normalization used in G either bn or SSM')
 
     # optimizers settings
     parser.add_argument('--lr_G', type=float, default=2e-4
@@ -108,8 +83,6 @@ def prepare_parser():
                         ,help = 'second momentum value for ADAM optimizer')
     parser.add_argument('--batch_size', type=int, default=64
                         ,help = 'discriminator batch size')
-    parser.add_argument('--G_batch_size', type=int, default=None
-                        ,help = 'generator batch size if None it will be set to batch_size')
     
     #training settings
     parser.add_argument('--loss', type=str, default='standard'
@@ -117,10 +90,8 @@ def prepare_parser():
     parser.add_argument('--disc_iters', type=int, default=1
                         ,help = ' no. discriminator updates per one generator update')
     parser.add_argument('--epochs', type=int, default=1
-                        ,help ='no. of epochs')
-    parser.add_argument('--limit', type=float, default=None
-                        ,help = 'if not None will limit training to --limit seconds')
-    parser.add_argument('--save_rate', type=int, default=30
+                        ,help ='number of epochs')
+    parser.add_argument('--saving_rate', type=int, default=30
                         ,help = 'save checkpoints every 30 epcohs')
     parser.add_argument('--ema',action='store_true' , default=False
                         ,help = 'keep EMA of G weights')
@@ -128,34 +99,28 @@ def prepare_parser():
                         ,help = 'EMA decay rate')
     parser.add_argument('--decay_lr',type=str,default=None
                         ,help = 'if not None decay the learning rates (exp,step)')
-    parser.add_argument('--saved_cp', type=str, default=None
-                        ,help='if not None start training from a loaded cp with path --saved_cp') 
     parser.add_argument('--seed', type=int, default=None
                        ,help = 'None to use random seed can be fixed for reporoduction')
-    parser.add_argument('--z_dist', type=str, default='normal'
-                       , help = ' distribution of latent space normal/uniform')
     parser.add_argument('--smooth',default=False,action='store_true'
                        , help = 'Use smooth labeling if True')
-    parser.add_argument('--x_fake_GD', action='store_true' , default=False
-                        ,help='Use same fake data for both G and D')
-
+    
     # patch generation parameters
-    parser.add_argument('--G_patch_1D',default=False,action='store_true'
-                       , help = 'Generate patches in 1D')
-    parser.add_argument('--m_dim', type=int, default=4
-                        ,help ='dimension of map m')
-    parser.add_argument('--num_patches_per_img', type=int, default=2
-                        ,help ='num_patches_per_img')
-    parser.add_argument('--G_patch_2D',default=False,action='store_true'
-                       , help = 'Generate patches in 2D')
-    parser.add_argument('--num_patches_w', type=int, default=3
-                        ,help ='num_patches_w')
-    parser.add_argument('--num_patches_h', type=int, default=3
-                        ,help ='num_patches_h')                      
-    parser.add_argument('--outer_padding', type=str, default='replicate'
-                        ,help='padding used in the borders of the outer patches')
+    parser.add_argument('--num_images', type=int, default=8
+                        ,help ='number of images generated by the generator')
+    parser.add_argument('--num_patches_width', type=int, default=3
+                        ,help ='Number of patches along the width dimension of the image')
+    parser.add_argument('--num_patches_height', type=int, default=3
+                        ,help ='Number of patches along the height dimension of the image')                      
+    parser.add_argument('--outer_padding', type=str, default='constant'
+                        ,help='padding used in the borders of the outer patches either replicate or constant for zero padding')
+    parser.add_argument('--padding_size', type=int, default=1
+                        ,help ='padding size used in local padding')
+    parser.add_argument('--conv_reduction', type=int, default=2
+                        ,help ='reduction after the convolution operator')
+    
+    
     # GPU settings
-    parser.add_argument('--ngpu', type=int, default=1
+    parser.add_argument('--num_gpus', type=int, default=1
                         ,help = 'number of gpus to be used')                                     
     parser.add_argument('--dev_num', type=int, default=0
                         ,help = 'the index of a gpu to be used if --ngpu is 1 ')
@@ -164,64 +129,12 @@ def prepare_parser():
                         
     # folder name             
     parser.add_argument('--fname', type=str, default='models_cp',help='folder name to save cp')
-                        
-    # Conditional GAN settings
-    parser.add_argument('--D_cond_method', type=str, default='concat'
-                        ,help='conditiong method concat for concatentation/proj for projection')
-    parser.add_argument('--G_cond_method', type=str, default='cbn'
-                        ,help='conditiong method concat for concatentation/cbn for conditional batch normalization')
-    parser.add_argument('--n_cl', type=int, default=0
-                       ,help = 'number of classes, 1 for continious conditioning')
-    parser.add_argument('--real_cond_list', nargs='+', default=None,type=float
-                        ,help='List of conditions values for the real samples e.g. 0.25 0.30 0.35 if not provided it will be  0 1 2 ..')   
-    parser.add_argument('--discrete',action='store_true' , default=False
-                       ,help = 'if True Sample only discrete labels from min_label to max_label')  
-    parser.add_argument('--c_list', nargs='+', default=None,type=float
-                        ,help='list of conditions to be sampled, if provided')                                                                                   
-    parser.add_argument('--min_label', type=float, default=0
-                        ,help='minimum label for conditions')
-    parser.add_argument('--max_label', type=float, default=None
-                        ,help='maximum label for conditions, if None will be set num of classes')
-    parser.add_argument('--ohe',action='store_true' , default=False
-                       ,help = 'use one hot encoding for conditioning')
-    parser.add_argument('--SN_y', action='store_true' , default=False
-                        ,help='apply SN to the condition linear layer')
-    parser.add_argument('--y_real_GD', action='store_true' , default=False
-                        ,help='Use same real conditions for both G and D')
 
     return parser
-
-# these arguments apply only when running sample.py file to generate images.                        
-def add_sample_parser(parser):
-                        
-    # paths                    
-    parser.add_argument('--G_cp', type=str, default=None
-                        ,help='path of generator checkpoint .pth file ')
-    parser.add_argument('--out_path', type=str, default='out'
-                       ,help = 'path to save images')
-    parser.add_argument('--many', type=str, default=None
-                        ,help='dir of the folder that contains .pth files to generate from multiple checkpoints')                 
-    parser.add_argument('--truncated', type=float, default=0
-                        ,help = 'if greater than 0 it will apply a truncation to normal dist. with --truncated value')
-    parser.add_argument('--num_imgs', type=int, default=1000
-                       , help = 'number of images to be generated')
-    parser.add_argument('--img_name', type=str, default=''
-                       ,help = 'append a string to the generate images numbers')
-                                          
-    # Genertared images configuration                    
-    parser.add_argument('--figure', type=str, default='grid'
-                        ,help='grid to save a grid of generated images or images to save them in --out_path')
-    parser.add_argument('--grid_rows', type=int, default=3
-                        ,help='num of rows in the grid')
-    parser.add_argument('--gray2rgb', default=True,action='store_false'
-                        ,help='If True save single-channel images as 3 channels')
-    return parser
-
-
 
 def prepare_device(args):
     # Device
-    ngpu = args.ngpu
+    ngpu = args.num_gpus
     print("Device: ",args.dev_num)
 
     if ngpu==1:
@@ -237,68 +150,23 @@ def prepare_device(args):
 def prepare_seed(args):
     #Seeds
     if args.seed is None:
-        seed = random.randint(1, 10000) # use if you want new results
+        # use if you want new results
+        seed = random.randint(1, 10000) 
     else : 
-        seed = args.seed #random.randint(1, 10000) # use if you want new results
+        seed = args.seed 
 
     print("Random Seed: ", seed)
     return seed
    
-
-
-def init_weight(m):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
-        nn.init.orthogonal_(m.weight, gain=1)
-        if m.bias is not None:
-            m.bias.data.zero_()
-            
-    elif classname.find('Batch') != -1:
-        m.weight.data.normal_(1,0.02)
-        m.bias.data.zero_()
-    
-    elif classname.find('Linear') != -1:
-        nn.init.orthogonal_(m.weight, gain=1)
-        if m.bias is not None:
-            m.bias.data.zero_()
-    
-    elif classname.find('Embedding') != -1:
-        nn.init.orthogonal_(m.weight, gain=1)
-        
-
-#dataset
 def prepare_data(args):
     print(" laoding " +args.data +" ...")
 
-    if args.random_crop_h:
-        if args.random_crop_w is None:
-            args.random_crop_w = args.random_crop_h
-        args.random_crop = (args.random_crop_h,args.random_crop_w)
-        
     if args.resize_h is None and args.resize_w is None:
         resize = None
     else:
         resize = (args.resize_h,args.resize_w)
 
-
-    if  args.data == 'cifar':
-        train_data = dset.CIFAR10(root='./data', train=True, download=True,
-                                   transform=transforms.Compose([
-                                       # transforms.Resize(image_size),
-                                       # transforms.CenterCrop(image_size),
-                                       transforms.ToTensor(),
-                                       transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                                   ]))
-
-    elif args.data == 'channels':
-        from datasets import datasets_classes
-        train_data = datasets_classes.Channels(path = args.data_path
-                                                ,csv_path = args.csv_path
-                                                ,ext = args.data_ext
-                                                ,sampling = args.sampling
-                                                ,random_crop = args.random_crop
-                                                ,center_crop = args.center_crop)
-    elif args.data == 'single_image':
+    if args.data == 'single_image':
         from datasets import datasets_classes
         train_data = datasets_classes.single_image(path = args.data_path
                                                 ,ext = args.data_ext
@@ -327,38 +195,18 @@ def prepare_data(args):
 
 
             
-def prepare_models(args,n_cl = 0,device = 'cpu'):           
+def prepare_models(args,device = 'cpu'):           
     #model
-    if args.G_model == 'dcgan':
-        netG = generators.DC_Generator(args.zdim,img_ch=args.img_ch,base_ch= args.G_ch).to(device)
-        netG.apply(init_weight)
+    netG = ResidualPatchGenerator(z_dim = args.z_dim,G_ch = args.G_ch,base_res=args.base_res,n_layers_G = args.n_layers_G,attention=args.attention,
+                                        img_ch= args.img_ch,leak = args.leak_G,SN = args.spec_norm_G,type_norm = args.type_norm_G,map_dim = args.map_dim,
+                                        padding_mode = args.padding_mode,outer_padding = args.outer_padding,
+                                        num_patches_h = args.num_patches_height,num_patches_w=args.num_patches_width,
+                                        padding_size = args.padding_size,conv_reduction = args.conv_reduction).to(device)
+        
+        
 
-    elif args.G_model == 'residual_GAN':
-        netG = generators.Res_Generator(args,n_classes = n_cl).to(device)
-
-    if args.D_model == 'dcgan':
-        netD = discriminators.DC_Discriminator(img_ch=args.img_ch
-                                             ,base_ch= args.D_ch
-                                             ,leak = args.leak_D
-                                             ,n_layers = args.n_layers_D).to(device)  
-        netD.apply(init_weight)
-
-    elif args.D_model == 'cnn_sngan':
-        netD = discriminators.SN_Discriminator(img_ch=args.img_ch
-                                            ,base_ch= args.D_ch
-                                            ,leak = args.leak_D
-                                            ,SN=args.spec_norm_D).to(device)  
-        netD.apply(init_weight)                            
-
-    elif args.D_model == 'residual_GAN':
-        netD = discriminators.Res_Discriminator(img_ch=args.img_ch,n_classes = n_cl,base_ch = args.D_ch
-                                    ,leak = args.leak_D,att = args.att
-                                    ,cond_method = args.D_cond_method
-                                    ,SN = args.spec_norm_D
-                                    ,SN_y = args.SN_y).to(device)
-
-    elif args.D_model == 'patch_GAN':
-        netD = discriminators.Patch_Discriminator(img_ch=args.img_ch,base_ch = args.D_ch,n_layers_D=args.n_layers_D,kw = 4
+    if args.D_model == 'patch_GAN':
+        netD = Patch_Discriminator(img_ch=args.img_ch,base_ch = args.D_ch,n_layers_D=args.n_layers_D,kw = 4
                                     ,SN= args.spec_norm_D,norm_layer = args.norm_layer_D).to(device)
     return netG,netD
 
@@ -400,139 +248,62 @@ def prepare_filename(args):
         filename = args.fname+"/" + filename
     return filename
 
-    
-#generate random labels
-def sample_pseudo_labels(args,num_classes,batch_size,device):
-    #returns labels used in D and G respectively.
-    if args.max_label is None:
-        max_value = num_classes
-    else:
-        max_value = args.max_label     
-    #if num_classes > 1:
 
-    # list of  conditions
-    if args.c_list is not None:
-        c = torch.tensor(args.c_list)
-        y_ind =  torch.randint(low=0, high=len(c), size=(batch_size,1))
-        y = c[y_ind].to(device)
-        return y,y
+def sample_from_gen_PatchByPatch(netG,z_dim=128,base_res=4,map_dim = 4,num_images=1, num_patches_height=3, num_patches_width=3,device ='cpu'): 
+        """  
+            Generate images using the generator network netG in a patch-by-patch fashion.
 
-    # discrete conditions
-    elif args.discrete:
-        y =  torch.randint(low=int(args.min_label), high=int(max_value), size=(batch_size,1)).to(device)
-        return y,y
-    elif args.ohe:
-        y =  torch.randint(low=int(args.min_label), high=int(max_value), size=(batch_size,)).to(device)
-        y_ohe = torch.eye(num_classes)[y].to(device)
-        return y_ohe,y_ohe
+            Args:
+                generator (torch.nn.Module): The generator network used for image synthesis.
+                num_images (int): Number of synthetic images to generate (default is 1).
+                num_patches_height (int): Number of patches along the height dimension of the image (default is 3).
+                num_patches_width (int): Number of patches along the width dimension of the image (default is 3).
+                device (str): Device on which to perform the generation (default is 'cpu').
 
-    else: # continious conditions
-        y = (args.max_label - args.min_label) * torch.rand(batch_size,num_classes) + args.min_label
-        y = y.to(device)
-        return y,y
-
-def disc_2_ohe(y,num_classes,device):
-    y_ohe = torch.eye(num_classes)[y].to(device)
-    return y_ohe
-
-def disc_2_cont(y,c_list,device): # convert discrete label to label in c_list
-    for i,v in enumerate(c_list):
-        y[y==i] = v
-    y = y.unsqueeze(1)
-    return y    
-    
-#generate fake images
-def sample_from_gen(args,b_size, zdim, num_classes,netG,device ='cpu',truncated = 0,real_y = None): 
-
-    # latent z
-    if args.z_dist == 'normal': 
-        z = torch.randn(b_size, zdim).to(device=device)
-    elif args.z_dist =='uniform':
-        z =2*torch.rand(b_size, zdim).to(device=device) -1
-        
-    if truncated > 0:
-        z = get_trun_noise(truncated,zdim,b_size,device)
-
-    #labels
-    if num_classes>0:
-        if args.y_real_GD:
-            y_D = real_y
-            y_G = real_y
+            Returns:
+                torch.Tensor: Tensor containing the generated images with shape (num_images, C, H, W), 
+                where H = num_patches_height*generator.base_res, W=num_patches_width*generator.base_res
+            """
+        if isinstance(netG, nn.DataParallel): 
+            n_layers_G =  netG.module.n_layers_G
+            type_norm = netG.module.type_norm
         else:
-            y_D,y_G = sample_pseudo_labels(args,num_classes,b_size,device)
-    else:
-        y_D,y_G = None,None
-
-    fake = netG(z, y_G)
+            n_layers_G =  netG.n_layers_G
+            type_norm = netG.type_norm
+            
+        num_patches_per_image = num_patches_height*num_patches_width
+        generator_batch_size = num_patches_per_image*num_images
+            
+        #Build the spatial latent input z 
+        z = torch.randn(generator_batch_size,z_dim,base_res,base_res).to(device)
     
-    return fake, y_D
-
-#generate fake patches
-def sample_patches_from_gen_1D(args,b_size, zdim,zdim_b,num_patches_per_img, num_classes,netG,device ='cpu',real_y = None): 
-
-    # latent z
-    if args.z_dist == 'normal': 
-        z = torch.randn(b_size, zdim).to(device=device)
-    elif args.z_dist =='uniform':
-        z =2*torch.rand(b_size, zdim).to(device=device) -1
-
+        #Build the second input M for stochastic spatial modulation
+        if type_norm == 'SSM':
+            maps_per_layers = []
+            pad_size = 4
+            for i in range(0,n_layers_G):
+                res_layer = (2**i)*base_res
+                res_with_pad = res_layer+pad_size
+                
+                # Build the spatial map input with a pad of size 4, since we use two 3x3 conv layers, for num_images N : (N,mdim ,Tot_layer_res_h +2, Tot_layer_res_w+2)
+                MAPS =  torch.randn(num_images,map_dim,num_patches_height*res_layer+pad_size,num_patches_width*res_layer+pad_size).to(device)
+                
+                # Crop the MAPS input into smaller overlapping patches of size res_layer + 4 with an overlap size of 4:  (N*num_patches_per_img,mdim ,res_layer +4, res_layer+4)
+                maps = crop_images(MAPS,res_with_pad,res_with_pad,res_layer,device = device)
+                
+                maps_per_layers.append((maps))
+        else:
+            maps_per_layers = [None]*n_layers_G
         
-    #border z
-    z_b = torch.randn(b_size, zdim_b,zdim_b).to(device=device)
-    
-    for k in range(b_size//num_patches_per_img): # for each image
-        for p in range(1,num_patches_per_img):
-            z_b[k*num_patches_per_img+p,:,0] = z_b[k*num_patches_per_img+p-1,:,-1]
+        # During training set the padding variable in to None for all layers in the generator
+        if netG.training:
+            padding_variable_in = [None]*(n_layers_G+2)
 
-    y_G = z_b
-    y_D = None
-    fake = netG(z, y_G)
-    
-    return fake, y_D
-
-def sample_patches_from_gen_2D(args,b_size,netG,h=None,w=None,device ='cpu'): 
-
-    
-    if h is None or w is None:
-        h = args.num_patches_h
-        w = args.num_patches_w
-    num_patches_per_img = h*w
-    n_imgs = b_size//num_patches_per_img
-
-
-    if args.z_dist == 'normal': 
-        pad_size = 2
-        res_withpadd = args.base_res + pad_size
-        z_merged =  torch.randn(n_imgs,args.zdim,h*args.base_res+pad_size,w*args.base_res+pad_size).to(device)
-        z = crop_fun_(z_merged,res_withpadd,res_withpadd,args.base_res,device = device)
-
-        #z = torch.randn(b_size, args.zdim,self.base_res, self.base_res).to(device=device)
-    elif args.z_dist =='uniform':
-        z =2*torch.rand(b_size, args.zdim).to(device=device) -1
-    
-    maps_per_res = []
-    pad_sizes = [4,4,4,4,4,4]    
-
-    for i in range(0,args.n_layers_G):
-    
-        res1 = (2**i)*args.base_res
-        res2 = res1
-        #res1,res2 = resols[i]
-        pad_size = pad_sizes[i]
-        maps_merged =  torch.randn(n_imgs,args.n_cl,h*res1+pad_size,w*res1+pad_size).to(device)
-        res_withpadd = res1+pad_size
-        maps = crop_fun_(maps_merged,res_withpadd,res_withpadd,res1,device = device)
-        maps_per_res.append((maps))
-
-   
-
-    y_G = maps_per_res
-    y_D = None
-    #print(z.shape)
-    fake = netG(z, y_G,h,w)
-    #print(fake.shape)
-    #exit()
-    return fake, maps_per_res
+        fake_images_patches,_ = netG.forward(z, maps_per_layers,padding_variable_in,padding_location = None)
+        
+        fake_images = merge_patches_into_image(fake_images_patches,num_patches_height,num_patches_width,device)
+        
+        return fake_images
 
 def scale_1D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'): 
     
@@ -546,10 +317,10 @@ def scale_1D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
     #if args.z_dist == 'normal': 
     
     pad_size_z = 2
-    z_merged =  torch.randn(n_imgs,args.zdim,h*args.base_res+pad_size_z,w*args.base_res+pad_size_z).to(device)
+    z_merged =  torch.randn(n_imgs,args.z_dim,h*args.base_res+pad_size_z,w*args.base_res+pad_size_z).to(device)
     res_withpadd_h = args.num_patches_h*args.base_res+pad_size_z
     res_withpadd_w = args.num_patches_w*args.base_res+pad_size_z
-    z_local = crop_fun_(z_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*args.base_res,device = device)
+    z_local = crop_images(z_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*args.base_res,device = device)
         
 
     #print(z_local.shape)
@@ -564,7 +335,7 @@ def scale_1D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
         maps_merged =  torch.randn(n_imgs,args.n_cl,h*res1+pad_size_maps,w*res1+pad_size_maps).to(device)
         res_withpadd_h = args.num_patches_h*res1+pad_size_maps
         res_withpadd_w = args.num_patches_w*res1+pad_size_maps
-        maps_local = crop_fun_(maps_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res1,device = device)
+        maps_local = crop_images(maps_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res1,device = device)
         maps_local_per_res.append(maps_local)
     
     gen_res = (2**(args.n_layers_G-1))*args.base_res
@@ -573,13 +344,13 @@ def scale_1D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
     padding_variable = None
     for j in range(maps_local.size(0)): # num of iteration through netG
         res_withpadd = args.base_res + pad_size_z
-        z = crop_fun_(z_local[[j]],res_withpadd,res_withpadd,args.base_res,device = device)
+        z = crop_images(z_local[[j]],res_withpadd,res_withpadd,args.base_res,device = device)
         maps_per_res = []
         #print(z.shape)
         for i in range(0,args.n_layers_G):
             res1 = (2**i)*args.base_res
             res_withpadd = res1 + pad_size_maps
-            maps = crop_fun_(maps_local_per_res[i][[j]],res_withpadd,res_withpadd,res1,device = device)
+            maps = crop_images(maps_local_per_res[i][[j]],res_withpadd,res_withpadd,res1,device = device)
             maps_per_res.append(maps)
             #print(maps.shape)
         y_G = maps_per_res 
@@ -588,7 +359,7 @@ def scale_1D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
             #print(fake.shape)
         fake = fake.cpu() # (9,_,_,_)
         
-        img_merged = merge_patches_2D(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
+        img_merged = merge_patches_into_image(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
         #torch.save(img_merged, str(j)+'img.pt')
         #print(img_merged.shape)
 
@@ -619,10 +390,10 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
 
     # generate z
     pad_size_z = 2
-    z_merged =  torch.randn(n_imgs,args.zdim,h*args.base_res+pad_size_z,w*args.base_res+pad_size_z).to(device)
+    z_merged =  torch.randn(n_imgs,args.z_dim,h*args.base_res+pad_size_z,w*args.base_res+pad_size_z).to(device)
     res_withpadd_h = args.num_patches_h*args.base_res+pad_size_z
     res_withpadd_w = args.num_patches_w*args.base_res+pad_size_z
-    z_local = crop_fun_(z_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*args.base_res,device = device)
+    z_local = crop_images(z_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*args.base_res,device = device)
         
 
 
@@ -635,7 +406,7 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
         maps_merged =  torch.randn(n_imgs,args.n_cl,h*res1+pad_size_maps,w*res1+pad_size_maps).to(device)
         res_withpadd_h = args.num_patches_h*res1+pad_size_maps
         res_withpadd_w = args.num_patches_w*res1+pad_size_maps
-        maps_local = crop_fun_(maps_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res1,device = device)
+        maps_local = crop_images(maps_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res1,device = device)
         maps_local_per_res.append(maps_local)
     
     gen_res = (2**(args.n_layers_G-1))*args.base_res
@@ -668,7 +439,7 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
                     res_withpadd_h = 1
                     #print(res_withpadd_w)
                     #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
-                    padding_variable_h_out_conv = crop_fun_(padding_variable_h_out_row[ind_layer][ind_conv],
+                    padding_variable_h_out_conv = crop_images(padding_variable_h_out_row[ind_layer][ind_conv],
                                                                    res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res,device = 'cpu')
                     #print(padding_variable_h_out_conv.shape)
                     #for instance in padding_variable_v_out_conv:
@@ -701,7 +472,7 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
             
             # Get z
             res_withpadd = args.base_res + pad_size_z
-            z = crop_fun_(z_local[[n]],res_withpadd,res_withpadd,args.base_res,device = device)
+            z = crop_images(z_local[[n]],res_withpadd,res_withpadd,args.base_res,device = device)
             
             
             # Get map
@@ -709,7 +480,7 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
             for i in range(0,args.n_layers_G):
                 res1 = (2**i)*args.base_res
                 res_withpadd = res1 + pad_size_maps
-                maps = crop_fun_(maps_local_per_res[i][[n]],res_withpadd,res_withpadd,res1,device = device)
+                maps = crop_images(maps_local_per_res[i][[n]],res_withpadd,res_withpadd,res1,device = device)
                 maps_per_res.append(maps)
             y_G = maps_per_res 
             
@@ -760,7 +531,7 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
             torch.cuda.empty_cache()
             
             # concatenate the generated patches
-            img_merged = merge_patches_2D(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
+            img_merged = merge_patches_into_image(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
             #torch.save(img_merged, str(j)+'img.pt')
             #print(img_merged.shape)
 
@@ -793,60 +564,44 @@ def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'):
 
     return full_img
 
-def random_sample_coord_grid(args,meta_grid,h=6, w= 6,n_imgs = 1):
 
-    # in pixel space 
-    y_size = h*args.img_res
-    x_size = h*args.img_res
+def merge_patches_into_image(patches, num_rows=3, num_cols=3, device='cpu'):
+    """
+    Merge 2D patches into complete images.
 
-    #print(meta_grid.size(1),meta_grid.size(2))
-    # should be sampled in pixel space.
-    y_st_ind = torch.randint(0,meta_grid.size(1)-y_size+1,(n_imgs,))
-    x_st_ind = torch.randint(0,meta_grid.size(2)-x_size+1,(n_imgs,))
+    Args:
+        patches (torch.Tensor): Input tensor of patches with shape (batch_size, channels, patch_height, patch_width).
+        num_rows (int): Number of rows of patches in each image (default is 3).
+        num_cols (int): Number of columns of patches in each image (default is 3).
+        device (str): Device on which to perform the merging (default is 'cpu').
 
-    #print(y_st_ind,x_st_ind)
-    #res = args.base_res*2 # patch res. at G  1st layer 
-    #for local_grids_imgs in meta_grids: # for each resolution
-        # resolution of img 
-    #exit()
-    #print(y_st,x_st)
-    grids = []
-    for xx, yy in zip(x_st_ind, y_st_ind):
-        grid = meta_grid[:,  yy:yy+y_size,xx:xx+x_size] # (emb,img_y_size,img_x_size)
-        grids.append(grid)
+    Returns:
+        torch.Tensor: Tensor containing merged images with shape (batch_size//num_patches_per_img, channels, height, width).
+    """
+    batch_size, channels, patch_height, patch_width = patches.size()
+    num_patches_per_img = num_rows * num_cols
 
-    grids = torch.stack(grids).contiguous().clone().detach() # (n_imgs,emb,img_y_size,img_x_size)
-    
-    return grids # (n_imgs,emb,img_y_size,img_x_size)
+    # Calculate the dimensions of the merged images
+    merged_height = patch_height * num_rows
+    merged_width = patch_width * num_cols
 
+    # Initialize an empty tensor to store the merged images
+    merged_images = torch.empty((batch_size // num_patches_per_img, channels, merged_height, merged_width), device=device)
 
+    for k in range(batch_size // num_patches_per_img):  # for each image
+        merged_image = torch.tensor([]).to(device=device)
 
+        for r in range(num_rows):  # each row in each image
+            img_row = patches[k * num_patches_per_img + r * num_cols]
 
+            for c in range(1, num_cols):
+                img_row = torch.cat((img_row, patches[k * num_patches_per_img + r * num_cols + c]), dim=-1)
 
-def merge_patches_1D(patches,num_patches_per_img,device='cpu'):
-    b_size = patches.size(0)
-    imgs = torch.empty(b_size//num_patches_per_img,patches.size(1),patches.size(2),patches.size(3)*num_patches_per_img).to(device=device)
-    for k in range(b_size//num_patches_per_img): # for each image
-        img = patches[k*num_patches_per_img]
-        for p in range(1,num_patches_per_img):
-            img = torch.cat((img,patches[k*num_patches_per_img+p]),-1)
-        imgs[k] = img
-    return imgs.to(device=device)
-            
-def merge_patches_2D(patches,h=3,w=3,device = 'cpu'):
-    b_size = patches.size(0)
-    num_patches_per_img = h*w
-    imgs = torch.empty(b_size//num_patches_per_img,patches.size(1),patches.size(2)*h,patches.size(3)*w).to(device=device)
-    
-    for k in range(b_size//num_patches_per_img): # for each image
-        img = torch.tensor([]).to(device=device)
-        for r in range(h): # each row in each image
-            img_r = patches[k*num_patches_per_img+r*w]
-            for c in range(1,w):
-                img_r = torch.cat((img_r,patches[k*num_patches_per_img+r*w+c]),-1)
-            img = torch.cat((img,img_r),-2) # concatenate rows
-        imgs[k] = img
-    return imgs.to(device=device)
+            merged_image = torch.cat((merged_image, img_row), dim=-2)  # concatenate rows
+
+        merged_images[k] = merged_image
+
+    return merged_images.to(device=device)
             
 
 def load_netG(netG,checkpointname = None,add_module=False):
@@ -880,31 +635,6 @@ def get_trun_noise(truncated,z_dim,b_size,device):
     z = z.float().to(device)
     return z
 
-def save_grid(args,netG,device,nrows=3,ncol=3,out_path = 'plot'):
-    b_size = nrows*ncol
-    gen_images,_ = sample_from_gen(args,b_size,args.zdim,args.n_cl,netG,device,truncated = args.truncated)
-    gen_images = gen_images.cpu().detach()
-                        
-    if args.img_ch == 1:
-        gen_images = gen_images.squeeze()
-        plt.close('all')
-        fig,axes = plt.subplots(nrows,ncol,figsize=[10,10])
-        #fake = fake.permute((0,3, 2, 1))
-        for i,iax in enumerate( axes.flatten() ):
-            iax.imshow(gen_images[i,:,:])
-            iax.set_xticks([])
-            iax.set_yticks([])
-        fig.show()
-    else:
-        plt.close('all')
-        fig = plt.figure(figsize=(10,10))
-        l = vutils.make_grid(gen_images,nrow=nrows, padding=2, normalize=True).numpy()
-        plt.imshow(np.transpose(l,(1,2,0)))
-        plt.xticks([])
-        plt.yticks([])
-    fig.savefig(out_path+'.png')
-
-
 def elapsed_time(start_time):
     return time.time() - start_time
 
@@ -915,167 +645,124 @@ def calc_ralsloss_G(real, fake, margin=1.0):
     
     return loss
 
-def replace_face(img,old_face,new_face):
-    new_img = img.copy()
-    for x in range(np.size(new_img,0)):
-        for y in range(np.size(new_img,1)):
-            if sum(new_img[x,y,:] == old_face)==3 :
-                new_img[x,y,:] =  new_face
-    return new_img
-                
-'''def crop_fun(img,cropping_size = 256,stride = 256):
-    img_h = img.shape[0]
-    img_w=  img.shape[1]
-    good_crops = []
-    start_h = 0
-    end_h = cropping_size
-    while(end_h<=img_h):
-        start_w = 0
-        end_w = cropping_size
-        while(end_w<=img_w):
-            #crop
-            crop = img[start_h:end_h,start_w:end_w]
-            good_crops.append(crop)
-            start_w+= stride
-            end_w+=stride 
-        start_h+= stride
-        end_h+=stride
-    return good_crops
 
-def crop_fun_(img,cropping_size = 256,stride = 256,device='cpu'): # for a mini-batch
-    img = img.copy()
-    N = img.shape[0] # images in batch
-    batch_patches = torch.tensor([])
-    for l in range(N):
-        crops =  torch.tensor(np.array(crop_fun(img[l,:,:],cropping_size = cropping_size,stride = stride)))
-        batch_patches = torch.cat((batch_patches,crops),0)
-
-    return batch_patches.to(device=device)'''
-
-def crop_fun(img,cropping_size_h = 256,cropping_size_w=256,stride = 256,device = 'cpu'):
-    img_h = img.shape[1]
-    img_w=  img.shape[2]
-    crops = torch.tensor([]).to(device)
-
-    start_h = 0
-    end_h = cropping_size_h
-    #print(img_h)
-    #print(cropping_size_h)
-    while(end_h<=img_h):
-        #print('h')
-        start_w = 0
-        end_w = cropping_size_w
-        while(end_w<=img_w):
-            #print('w')
-            #crop
-            crop = img[:,start_h:end_h,start_w:end_w]
-            crops = torch.cat((crops,crop.unsqueeze(0)))
-            start_w+= stride
-            end_w+=stride 
-        start_h+= stride
-        end_h+=stride
-    return crops
-
-def crop_fun_(img,cropping_size_h = 256,cropping_size_w=256,stride = 256,device='cpu'): # for a mini-batch
-    img = img.clone()
-    N = img.shape[0] # images in batch
-    batch_patches = torch.tensor([]).to(device)
-    for l in range(N):
-        #print(l)
-        crops =  crop_fun(img[l,:,:,:],cropping_size_h = cropping_size_h,cropping_size_w=cropping_size_w,stride = stride,device=device)
-        batch_patches = torch.cat((batch_patches,crops),0)
-
-    return batch_patches#.to(device=device)
-
-
-def create_coord_gird(height, width,norm_height=None,norm_width=None, coord_init=None, coef=1):
-    if coord_init is None:
-        coord_init = (0, 0) # Workaround
-    if norm_height is None:
-        norm_height = height
-    if norm_width is None:
-        norm_width = width
-
-    x_range = torch.arange(width).type(torch.float32)  + coord_init[1]
-    y_range = torch.arange(height).type(torch.float32) + coord_init[0] 
-
-    #[-1,1] # larger during testing
-    x_range =(x_range/(norm_width-1))*2-1
-    y_range =(y_range/(norm_height-1))*2-1
-
-    x_coords = x_range.view(1, -1).repeat(height, 1) # [height, width]
-    y_coords = y_range.view(-1, 1).repeat(1, width) # [height, width]
-    
-    #print(x_coords.shape)
-    #print(y_coords.shape)
-    grid = torch.cat([
-            x_coords.unsqueeze(0), # apply cos later 
-            x_coords.unsqueeze(0), # apply sin later
-            y_coords.unsqueeze(0), # apply cos later
-            y_coords.unsqueeze(0), # apply sin later
-        ], 0)  #[4,H,W]
-    
-    #print(grid[0][0])
-    grid[0, :,:] = torch.cos(grid[0, :,:] * np.pi*coef)
-    grid[1, :,:] = torch.sin(grid[1, :,:] * np.pi*coef)
-    grid[2, :,:] = torch.cos(grid[2, :,:] * np.pi*coef)
-    grid[3, :,:] = torch.sin(grid[3, :,:] * np.pi*coef)
-    #print(grid[0][0])
-    #exit()
-    return grid
-
-def local_padding(args,input,pad_size =2,conv_red = 2,padding_variable_v = None,padding_variable_h = None,last = False):
-    
+def crop_images(img, cropping_size_h=256, cropping_size_w=256, stride=256, device='cpu'):
     """
-    Perform a local padding on the input data with the customizable parameters.
+    Crop input images in a PyTorch tensor into smaller patches and concatenate them together.
 
-    Parameters:
-    - input (Tensor): The input feature map on which the padding will be performed.
-    - pad_size (int): The size of padding to be applied. Default is 2.
-    - conv_red (int): The reduction of the size after convolution. Default is 2 for 3x3 conv.
-    - padding_variable_v (Variable): A vertical padding variable. Default is None.
-    - padding_variable_h (Variable): A horizontal padding variable. Default is None.
-    - last (bool): A flag indicating whether this is the last image in a row to be generated in a sequence. Default is False.
+    Args:
+        img (torch.Tensor): Input tensor containing a batch of images with shape (N, C, H, W).
+        cropping_size_h (int): Height of the cropped patches (default is 256).
+        cropping_size_w (int): Width of the cropped patches (default is 256).
+        stride (int): Stride for sliding the cropping window (default is 256).
+        device (str): Device on which to perform the cropping and concatenation (default is 'cpu').
 
     Returns:
-    - padded_input (Tensor): The input after local padding.
-    - pad_var_out_v (Tensor): The output vertical padding variable.
-    - pad_var_out_h (Tensor): The output horizontal padding variable.
+        torch.Tensor: Tensor containing concatenated patches with shape (N * P, C, cropping_size_h, cropping_size_w),
+                     where P is the number of patches per image.
     """
-
-    h = args.num_patches_h
-    w = args.num_patches_w  
-    outer_padding = args.outer_padding      
-    _,_,dx,dy = input.size()
     
-    
-    # merge patches together
-    merged_input = merge_patches_2D(input,h = h,w = w,device = input.device)
-    
-    
-    # get the last rows and columns to be used for the next generation step (if there is another step)
-    pad_var_out_v = merged_input[:,:,:,[dx*(h-1)-1]] # vertical slice
-    if last: 
-        pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:] 
-    else:
-        pad_var_out_h = merged_input[:,:,[dy*(w-1)-1],:dx*(h-1)]
+    # Clone the input tensor to avoid modifying the original data
+    img = img.clone()
+
+    # Get the number of images in the batch
+    N = img.shape[0]
+
+    # Initialize an empty tensor to store the concatenated patches
+    batch_patches = torch.tensor([]).to(device)
+
+    # Loop through each image in the batch
+    for l in range(N):
+        # Crop the image into smaller patches
+        crops = crop_image(img[l, :, :, :], cropping_size_h=cropping_size_h, cropping_size_w=cropping_size_w, stride=stride, device=device)
+
+        # Concatenate the patches to the batch_patches tensor
+        batch_patches = torch.cat((batch_patches, crops), 0)
+
+    return batch_patches
+   
+
+def crop_image(img, cropping_size_h=256, cropping_size_w=256, stride=256, device='cpu'):
+    """
+    Crop input image tensor into smaller patches.
+
+    Args:
+        img (torch.Tensor): Input tensor representing an image with shape (C, H, W).
+        cropping_size_h (int): Height of the cropped patches (default is 256).
+        cropping_size_w (int): Width of the cropped patches (default is 256).
+        stride (int): Stride for sliding the cropping window (default is 256).
+        device (str): Device on which to perform the cropping (default is 'cpu').
+
+    Returns:
+        torch.Tensor: Tensor containing cropped patches with shape (P, C, cropping_size_h, cropping_size_w),
+                     where P is the number of patches.
+    """
+    # Get the height and width of the input image
+    img_h = img.shape[1]
+    img_w = img.shape[2]
+
+    # Initialize an empty tensor to store the cropped patches
+    crops = torch.tensor([]).to(device)
+
+    # Initialize starting and ending indices for height
+    start_h = 0
+    end_h = cropping_size_h
+
+    # Iterate over height with a sliding window
+    while end_h <= img_h:
+        # Initialize starting and ending indices for width
+        start_w = 0
+        end_w = cropping_size_w
+
+        # Iterate over width with a sliding window
+        while end_w <= img_w:
+            # Crop the image
+            crop = img[:, start_h:end_h, start_w:end_w]
+
+            # Concatenate the crop to the crops tensor
+            crops = torch.cat((crops, crop.unsqueeze(0)))
+
+            # Update the width indices
+            start_w += stride
+            end_w += stride
+
+        # Update the height indices
+        start_h += stride
+        end_h += stride
+
+    return crops
 
 
-    # Perfrom outer padding manually depending on the iteration of the patches 
-    if padding_variable_h is None and padding_variable_v is None: # if thery are the first patches to be generated
-        merged_input = F.pad(merged_input, (pad_size,pad_size,pad_size,pad_size), outer_padding) 
-    elif padding_variable_h is None: # if thery are the intermediate patches to be generated in the first row
-        merged_input = torch.cat((padding_variable_v,merged_input),-1)
-        merged_input = F.pad(merged_input, (0,pad_size,pad_size,pad_size), outer_padding) 
-    elif padding_variable_v is None: # if thery are the final patches to be generated in the final rows
-        merged_input = F.pad(merged_input, (pad_size,pad_size,0,pad_size), outer_padding) 
-        merged_input = torch.cat((padding_variable_h,merged_input),-2)
-    elif padding_variable_h is not None and padding_variable_v is not None: # if thery are the intermediate patches to be generated in an intermediate row
-        merged_input = torch.cat((padding_variable_v,merged_input),-1)
-        merged_input = F.pad(merged_input, (0,pad_size,0,pad_size), outer_padding) 
-        merged_input = torch.cat((padding_variable_h,merged_input),-2) # extended
-
-    # perform cropping after padding is done to get the patches back
-    res_withpadd = dx +pad_size*conv_red
-    padded_input = crop_fun_(merged_input,res_withpadd,res_withpadd,dx,device = input.device)
-    return padded_input,pad_var_out_v,pad_var_out_h
+def init_weight(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.orthogonal_(m.weight, gain=1)
+        if m.bias is not None:
+            m.bias.data.zero_()
+            
+    elif classname.find('Batch') != -1:
+        m.weight.data.normal_(1,0.02)
+        m.bias.data.zero_()
+    
+    elif classname.find('Linear') != -1:
+        nn.init.orthogonal_(m.weight, gain=1)
+        if m.bias is not None:
+            m.bias.data.zero_()
+    
+    elif classname.find('Embedding') != -1:
+        nn.init.orthogonal_(m.weight, gain=1)
+       
+class _CustomDataParallel(nn.DataParallel):
+    def __init__(self,model,gpu_ids):
+        super(nn.DataParallel, self).__init__()
+        self.model = nn.DataParallel(model,gpu_ids).cuda()
+        
+        
+    def forward(self, *input):
+        return self.model(*input)
+    
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.model.module, name)
