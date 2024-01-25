@@ -13,7 +13,6 @@ import torch.nn.parallel
 import torch.optim as optim
 
 from utils import prepare_data,prepare_device,prepare_filename,prepare_models,prepare_parser,prepare_seed,elapsed_time,_CustomDataParallel,sample_from_gen_PatchByPatch
-#from  utils import *
 
 def train(args):
     
@@ -195,18 +194,16 @@ def train(args):
         D_losses.append(D_running_loss)
 
         # saving model checkpoints
-        if args.saving_rate is not None and (epoch%args.saving_rate ==0 or epoch+1 == args.epochs)  :
+        if args.saving_rate is not None and (epoch+1%args.saving_rate ==0 or epoch+1 == args.epochs)  :
             torch.save({
-                        'epoch': epoch,
+                        'epoch': epoch+1,
                         'netG_state_dict': netG.state_dict(),
                         'netD_state_dict': netD.state_dict(),
-                        'optimizerG_state_dict': optimizerG.state_dict(),
-                        'optimizerD_state_dict': optimizerD.state_dict(),
                         'Gloss':  G_losses,
                         'Dloss':  D_losses,
                         'args': args,
                         'seed': seed,
-                        }, filename+str(epoch) +".pth")
+                        }, filename+str(epoch+1) +".pth")
             
         # if last epoch then save the ema model and plot the losses
         if epoch+1 == args.epochs:
@@ -228,7 +225,6 @@ def train(args):
 
 
 if __name__ == '__main__':
-     # configurations
     parser = prepare_parser()
     args = parser.parse_args()          
     train(args)

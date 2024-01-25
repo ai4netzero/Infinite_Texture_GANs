@@ -15,7 +15,7 @@ class single_image(Dataset):
         self.sampling = sampling
         self.ext = ext
     
-        # for some simple binay geological images saved as text files
+        # some simple binay geological images are saved as text files
         if self.ext == 'txt': 
             self.img = np.loadtxt(self.img_path) #normalized
             self.img = Image.fromarray(self.img)

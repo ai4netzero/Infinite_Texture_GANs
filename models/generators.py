@@ -87,7 +87,7 @@ class ResidualPatchGenerator(nn.Module):
 
     def forward(self, z,maps=None,padding_variable_in= None,padding_location = None):
             
-        h,pad_var_start = self.start(z,padding_variable_in[0],padding_location)
+        h,pad_var_start = self.start(z,padding_variable_in[0],padding_location) # x
         
         h,pad_var_block1 = self.block1(h,maps[0],padding_variable_in[1],padding_location)
         
