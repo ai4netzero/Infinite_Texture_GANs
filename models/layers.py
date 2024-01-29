@@ -7,9 +7,7 @@ import utils
 
 class conv2d_lp(nn.Module):
     """2D Conv supports local padding.
-
-    Used in RRDB block in ESRGAN with local padding.
-
+    
     Args:
         ch_in (int): number of input channels.
         ch_out (int): number of output channels
