@@ -24,19 +24,23 @@ Below is an example of input flower image (614x440) and generated image of size 
 
 ## Dataset
 
-To train the GAN, you will need a single texture image. The image should be organized in the following specific directory structure:
+To train the models, you will need a single texture image. The image should be organized in the following specific directory structure:
 
 ```
 datasets/
-        image1.jpg
+        241.jpg
 ```
 
 ## Usage
-To train the GANs model, run the following command:
+To train the GANs model, run the following command 
+(Note that itt is recommended to use BN instead of SSM for most texture as it is much faster and don't produce artefacts):
 
 ```
-nohup python train.py --data_path datasets/241.jpg --data single_image --sampling 8000 --img_ch 3 --data_ext jpg --spec_norm_D --D_model patch_GAN --att --D_ch 64 --G_ch 52 --G_patch_2D --n_layers_G 6 --n_layers_D 4 --leak_G 0.02 --G_upsampling nearest --zdim 128 --base_res 4 --n_cl 1 --x_fake_GD --G_cond_method conv3x3 --num_patches_w 3 --num_patches_h 3   --batch_size 80 --random_crop 192 --epochs 300 --save_rate 50 --ema --smooth --dev_num 0 --ngpu 1 --fname 241_run1 > 241_run1.out &
+python train.py --data_path datasets/241.jpg --attention --leak_G 0.02 --sampling 8000 --spec_norm_D --padding_mode local --outer_padding replicate   --random_crop 192 --saving_rate 50  --epochs 2 --type_norm bn  --smooth --ema  --num_gpus 4 --gpu_list 0 1 2 3 --fname results/241_lp_bn_replicate_outerpadding
 ```
+
+To run the model with SSM set  ``` --type_norm SSM ```
+
 Make sure to replace datasets/241.jpg with the path to your image. Adjust other paramters according to your requirements (e.g., you can try to reduce training time by smaller model capacity by setting --n_layers_G 5 --n_layers_D 3).
 
 After training you can use the example notebook "generate_example.ipynb" to generate large arbitrary size texture images using the saved model. 
