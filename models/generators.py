@@ -1,6 +1,5 @@
 import torch.nn as nn
 from models.layers import LocalPadder,Attention,conv2d_lp,ResBlockGenerator
-#from utils import crop_images,merge_patches_into_image
 
 class ResidualPatchGenerator(nn.Module):
     """
@@ -45,12 +44,9 @@ class ResidualPatchGenerator(nn.Module):
         self.padding_size = padding_size
         self.conv_reduction = conv_reduction
         
-        if self.padding_mode == 'local':
-            self.local_padder = LocalPadder(num_patches_h =num_patches_h ,num_patches_w=num_patches_w,outer_padding = outer_padding
+        LocalPadder.set_attributes(num_patches_h =num_patches_h ,num_patches_w=num_patches_w,outer_padding = outer_padding
                                             ,padding_size = padding_size,conv_reduction = conv_reduction)
-        else:
-            self.local_padder = None
-
+        
         self.up = nn.Upsample(scale_factor=2,mode = 'nearest')
 
         if self.leak >0:
@@ -58,7 +54,7 @@ class ResidualPatchGenerator(nn.Module):
         else:
             self.activation = nn.ReLU()  
         
-        self.start = conv2d_lp(self.z_dim,self.base_ch*8,self.local_padder)
+        self.start = conv2d_lp(self.z_dim,self.base_ch*8)
         
         self.block1 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*8)
         self.block2 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*4)
@@ -82,54 +78,47 @@ class ResidualPatchGenerator(nn.Module):
         if self.attention:
             self.attention = Attention(self.base_ch*2,SN=SN)
     
-        self.final = conv2d_lp(final_chin,self.img_ch,self.local_padder)
+        self.final = conv2d_lp(final_chin,self.img_ch)
         
 
-    def forward(self, z,maps=None,padding_variable_in= None,padding_location = None):
+    def forward(self, z,maps=None,image_location = '1st_row_1st_col'):
             
-        h,pad_var_start = self.start(z,padding_variable_in[0],padding_location) # x
+        h = self.start(z,image_location) # x
         
-        h,pad_var_block1 = self.block1(h,maps[0],padding_variable_in[1],padding_location)
+        h = self.block1(h,maps[0],image_location)
         
         h = self.up(h) # 2x
-        h,pad_var_block2 = self.block2(h, maps[1],padding_variable_in[2],padding_location)
+        h = self.block2(h, maps[1],image_location)
         
         h = self.up(h) # 4x
-        h,pad_var_block3 = self.block3(h, maps[2],padding_variable_in[3],padding_location)
+        h = self.block3(h, maps[2],image_location)
         
         if self.attention:
             h = self.attention(h)
             
         h = self.up(h) # 8x
-        h,pad_var_block4 = self.block4(h, maps[3],padding_variable_in[4],padding_location)
+        h = self.block4(h, maps[3],image_location)
         
         # Form the output padding variable to be used for the next iteration during inference 
-        padding_variable_out = [pad_var_start,pad_var_block1,pad_var_block2,pad_var_block3,pad_var_block4]
+        #padding_variable_out = [pad_var_start,pad_var_block1,pad_var_block2,pad_var_block3,pad_var_block4]
         
         if self.n_layers_G >=5:
             h = self.up(h) # 16x
-            h,pad_var_block5 = self.block5(h, maps[4],padding_variable_in[5],padding_location)
-            padding_variable_out.append(pad_var_block5)
+            h = self.block5(h, maps[4],image_location)
         if self.n_layers_G == 6:
             h = self.up(h) # 32x
-            h,pad_var_block6 = self.block6(h, maps[5],padding_variable_in[6],padding_location)
-            padding_variable_out.append(pad_var_block6)
+            h = self.block6(h, maps[5],image_location)
 
         if self.type_norm == 'bn':
             h = self.bn(h)
             
         h = self.activation(h)
         
-        h,pad_var_final = self.final(h)
-        padding_variable_out.append(pad_var_final)
+        h = self.final(h,image_location)
         
         out = nn.Tanh()(h)
         
-        if self.training:
-            return out, None
-        else:
-            return out, padding_variable_out
-
-    #def forwar()
+        
+        return out
 
     

@@ -7,7 +7,7 @@ import random
 import torch.nn as nn
 import torch.utils.data
 import numpy as np
-
+from math import ceil
 from models.generators import ResidualPatchGenerator
 from models.discriminators import Patch_Discriminator
 
@@ -29,7 +29,7 @@ def prepare_parser():
                        ,help = 'resize for h ')
     parser.add_argument('--resize_w', type=int, default=None
                        ,help = 'resize for w')                                                                          
-    parser.add_argument('--sampling', type=int, default=None
+    parser.add_argument('--sampling', type=int, default=8000
                        ,help = 'randomly sample --sampling instances from the training data if not None')
     
     # models settings
@@ -215,320 +215,239 @@ def prepare_filename(args):
     return filename
 
 
-def sample_from_gen_PatchByPatch(netG,z_dim=128,base_res=4,map_dim = 4,num_images=1, num_patches_height=3, num_patches_width=3,device ='cpu'): 
-        """  
-            Generate images using the generator network netG in a patch-by-patch fashion.
-
-            Args:
-                generator (torch.nn.Module): The generator network used for image synthesis.
-                num_images (int): Number of synthetic images to generate (default is 1).
-                num_patches_height (int): Number of patches along the height dimension of the image (default is 3).
-                num_patches_width (int): Number of patches along the width dimension of the image (default is 3).
-                device (str): Device on which to perform the generation (default is 'cpu').
-
-            Returns:
-                torch.Tensor: Tensor containing the generated images with shape (num_images, C, H, W), 
-                where H = num_patches_height*generator.base_res, W=num_patches_width*generator.base_res
-            """
-        if isinstance(netG, nn.DataParallel): 
-            n_layers_G =  netG.module.n_layers_G
-            type_norm = netG.module.type_norm
-        else:
-            n_layers_G =  netG.n_layers_G
-            type_norm = netG.type_norm
-            
-        num_patches_per_image = num_patches_height*num_patches_width
-        generator_batch_size = num_patches_per_image*num_images
-            
-        #Build the spatial latent input z 
-        z = torch.randn(generator_batch_size,z_dim,base_res,base_res).to(device)
+def build_z(num_images=1,z_dim=128,base_res=4,num_patches_height=3, num_patches_width=3,total_num_patches_height=3, total_num_patches_width=3,device='cpu'):
     
-        #Build the second input M for stochastic spatial modulation
-        if type_norm == 'SSM':
-            maps_per_layers = []
-            pad_size = 4
-            for i in range(0,n_layers_G):
-                res_layer = (2**i)*base_res
-                res_with_pad = res_layer+pad_size
-                
-                # Build the spatial map input with a pad of size 4, since we use two 3x3 conv layers, for num_images N : (N,mdim ,Tot_layer_res_h +2, Tot_layer_res_w+2)
-                MAPS =  torch.randn(num_images,map_dim,num_patches_height*res_layer+pad_size,num_patches_width*res_layer+pad_size).to(device)
-                
-                # Crop the MAPS input into smaller overlapping patches of size res_layer + 4 with an overlap size of 4:  (N*num_patches_per_img,mdim ,res_layer +4, res_layer+4)
-                maps = crop_images(MAPS,res_with_pad,res_with_pad,res_layer,device = device)
-                
-                maps_per_layers.append((maps))
-        else:
-            maps_per_layers = [None]*n_layers_G
-        
-        # During training set the input padding variable to None for all layers in the generator
-        #if netG.training:
-        padding_variable_in = [None]*(n_layers_G+2)
-
-        fake_images_patches,_ = netG(z, maps_per_layers,padding_variable_in,padding_location = None)
-        
-        fake_images = merge_patches_into_image(fake_images_patches,num_patches_height,num_patches_width,device)
-        
-        return fake_images
-
-def scale_1D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'): 
     
-    if h is None or w is None:
-        h = args.num_patches_h
-        w = args.num_patches_w
-        
-    #num_patches_per_img = h*w
-    #n_imgs = b_size//num_patches_per_img
-    #b_size =n_imgs*num_patches_per_img
-    #if args.z_dist == 'normal': 
+    image_base_height = total_num_patches_height*base_res
+    image_base_width = total_num_patches_width*base_res
     
-    pad_size_z = 2
-    z_merged =  torch.randn(n_imgs,args.z_dim,h*args.base_res+pad_size_z,w*args.base_res+pad_size_z).to(device)
-    res_withpadd_h = args.num_patches_h*args.base_res+pad_size_z
-    res_withpadd_w = args.num_patches_w*args.base_res+pad_size_z
-    z_local = crop_images(z_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*args.base_res,device = device)
-        
+    # Build the spatial latent input z for the full image
+    z_full_image = torch.randn(num_images,z_dim,image_base_height,image_base_width).to(device)
+    
+    # Crop the z input into overlapping sub-image each has resolution of (num_patches_height*base_res,num_patches_width*base_res)
+    # The overlap is of size base_res and is needed to regenerate the outer patches in the next steps with appopriate padding
+    z_sub_image = crop_images(z_full_image,num_patches_height*base_res,num_patches_width*base_res,(num_patches_width-1)*base_res,device = device)
+    
+    return z_sub_image
 
-    #print(z_local.shape)
-    maps_local_per_res = []
-    #pad_sizes = [4,4,4,4,4,4]    
+
+def build_maps(num_images=1,map_dim=1,n_layers_G=4,base_res=4,num_patches_height=3, num_patches_width=3,total_num_patches_height=3, total_num_patches_width=3,device='cpu'):
+    
+    maps_sub_image = []
     pad_size_maps = 4
-    for i in range(0,args.n_layers_G):
-    
-        res1 = (2**i)*args.base_res
-        #res1,res2 = resols[i]
-        #pad_size = pad_sizes[i]
-        maps_merged =  torch.randn(n_imgs,args.n_cl,h*res1+pad_size_maps,w*res1+pad_size_maps).to(device)
-        res_withpadd_h = args.num_patches_h*res1+pad_size_maps
-        res_withpadd_w = args.num_patches_w*res1+pad_size_maps
-        maps_local = crop_images(maps_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res1,device = device)
-        maps_local_per_res.append(maps_local)
-    
-    gen_res = (2**(args.n_layers_G-1))*args.base_res
-    #print(maps_local.shape)
-
-    padding_variable = None
-    for j in range(maps_local.size(0)): # num of iteration through netG
-        res_withpadd = args.base_res + pad_size_z
-        z = crop_images(z_local[[j]],res_withpadd,res_withpadd,args.base_res,device = device)
-        maps_per_res = []
-        #print(z.shape)
-        for i in range(0,args.n_layers_G):
-            res1 = (2**i)*args.base_res
-            res_withpadd = res1 + pad_size_maps
-            maps = crop_images(maps_local_per_res[i][[j]],res_withpadd,res_withpadd,res1,device = device)
-            maps_per_res.append(maps)
-            #print(maps.shape)
-        y_G = maps_per_res 
-        with torch.no_grad():
-            fake,padding_variable = netG(z, y_G,args.num_patches_h,args.num_patches_w,padding_variable)
-            #print(fake.shape)
-        fake = fake.cpu() # (9,_,_,_)
+    for i in range(0,n_layers_G):
+        res_layer = (2**i)*base_res
         
-        img_merged = merge_patches_into_image(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
-        #torch.save(img_merged, str(j)+'img.pt')
-        #print(img_merged.shape)
-
-        if j != maps_local.size(0)-1: # last patch
-            img_merged = img_merged[:,:,:,0:gen_res*2]
+        # Build the spatial map for the full image at this layer
+        # Add padding of 4 because the maps are passed to a 2 consecutive conv. layers.
+        maps_full_image =  torch.randn(num_images,map_dim,total_num_patches_height*res_layer+pad_size_maps,total_num_patches_width*res_layer+pad_size_maps).to(device)
         
-        #print(img_merged.shape)
+        # Crop the map input into overlapping sub-image each has resolution of (num_patches_height*res_layer+pad_size_maps,num_patches_width*res_layer+pad_size_maps)
+        # The overlap is of size res_layer and is needed to regenerate the outer patches in the next steps with appopriate padding
+        map_res_with_padding_h = num_patches_height*res_layer+pad_size_maps
+        map_res_with_padding_w = num_patches_width*res_layer+pad_size_maps
+        maps_layer_i = crop_images(maps_full_image,map_res_with_padding_h,map_res_with_padding_w,(num_patches_width-1)*res_layer,device = device)
+        
+        maps_sub_image.append(maps_layer_i)
 
-        if j ==0:
-            full_img = img_merged
-        else:
-            full_img = torch.cat((full_img,img_merged),-1)
-
-    return full_img
-
-def scale_2D(args,netG,n_imgs = 1,h=None,w=None,device ='cpu'): 
+    return maps_sub_image
     
-    if h is None or w is None:
-        h = args.num_patches_h
-        w = args.num_patches_w
-        
-    #steps_h = int(np.ceil(h/args.num_patches_h))
-    #steps_w = int(np.ceil(w/args.num_patches_w))
+def sample_from_gen_PatchByPatch_test(netG,z_dim=128,base_res=4,map_dim = 1,num_images=1,
+                                      num_patches_height=3, num_patches_width=3,device ='cpu',output_resolution_height = 384,output_resolution_width = 384): 
+    """
+    Generate a large image using a Patch-by-Patch sampling approach from a PyTorch generator network.
+
+    This function generates the large image in steps, where each step involves generating a sub-image.
+    The outer patches in each sub_image is padded using outer_padding (zeros or replicate padding).
+    These patches are re-generated in the next sub-image with local padding and the previously generated outer patches are dropped.
+    The sub-images are concatenated first vertically to form rows and then generation continues row by row.
+    Finally, the rows are concatenated to form the complete large image.
+
+    Parameters:
+    - netG (nn.Module): The PyTorch generator network used for image generation.
+    - z_dim (int): Dimension of the input latent vector (default is 128).
+    - base_res (int): Base resolution of the generated image (default is 4).
+    - map_dim (int): Dimension of the maps used in case of SSM (default is 1).
+    - num_images (int): Number of images to generate (default is 1).
+    - num_patches_height (int): Number of patches along the height dimension (default is 3).
+    - num_patches_width (int): Number of patches along the width dimension (default is 3).
+    - device (str): Device on which to perform the generation (default is 'cpu').
+    - output_resolution_height (int): Desired height of the output large image in pixels (default is 384).
+    - output_resolution_width (int): Desired width of the output large image in pixels  (default is 384).
+
+    Returns:
+    torch.Tensor: The generated large image tensor of shape (num_images, 3, output_resolution_height, output_resolution_width).
+    """
+
+
+    if isinstance(netG, nn.DataParallel): 
+        n_layers_G =  netG.module.n_layers_G
+        type_norm = netG.module.type_norm
+    else:
+        n_layers_G =  netG.n_layers_G
+        type_norm = netG.type_norm
     
-    # (h-1) should be mutiple of (num_patches_h-1)
-    steps_h = int((h-1)/(args.num_patches_h-1))
-    steps_w = int((w-1)/(args.num_patches_w-1))
+    # The image patch resolution generated by the generator
+    generator_patch_resolution = (2**(n_layers_G-1))*base_res
 
-    # generate z
-    pad_size_z = 2
-    z_merged =  torch.randn(n_imgs,args.z_dim,h*args.base_res+pad_size_z,w*args.base_res+pad_size_z).to(device)
-    res_withpadd_h = args.num_patches_h*args.base_res+pad_size_z
-    res_withpadd_w = args.num_patches_w*args.base_res+pad_size_z
-    z_local = crop_images(z_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*args.base_res,device = device)
-        
-
-
-    # generate maps
-    maps_local_per_res = []
-    pad_size_maps = 4
-    for i in range(0,args.n_layers_G):
     
-        res1 = (2**i)*args.base_res
-        maps_merged =  torch.randn(n_imgs,args.n_cl,h*res1+pad_size_maps,w*res1+pad_size_maps).to(device)
-        res_withpadd_h = args.num_patches_h*res1+pad_size_maps
-        res_withpadd_w = args.num_patches_w*res1+pad_size_maps
-        maps_local = crop_images(maps_merged,res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res1,device = device)
-        maps_local_per_res.append(maps_local)
+    # calculate the number of steps in both dimensions required to iterate through the generator to generate the full image
+    steps_h = ceil((output_resolution_height/generator_patch_resolution - 1)/(num_patches_height-1))
+    steps_w = ceil((output_resolution_width/generator_patch_resolution - 1)/(num_patches_width-1))
     
-    gen_res = (2**(args.n_layers_G-1))*args.base_res
-    #print(maps_local.shape)
-
-    #padding_variable_h,padding_variable_v = None
-    #for j in range(maps_local.size(0)): # num of iteration through netG
+    # calculate how many patches needed to be generated
+    total_num_patches_height = steps_h*(num_patches_height-1)+1
+    total_num_patches_width = steps_w*(num_patches_width-1)+1
     
-    n = 0
-    padding_variable_h_in = None
-    padding_variable_h_out_row = None
-    padding_variable_h_in_row = None
-    full_img_row =None
-    for s_i in range(steps_h):
-        
-        padding_variable_v_in = None
-        padding_variable_h_out_conv_all =[]
-        # crop the padding_variable_h_out_row to form padding_variable_h_in
-        if padding_variable_h_out_row is not None:
-            for ind_layer,layer_out in enumerate(padding_variable_h_out_row):
-                conv_list = []
-                for ind_conv,conv_out in enumerate(layer_out):
-                    # replicate padding             
-                    padding_variable_h_out_row[ind_layer][ind_conv] = F.pad(padding_variable_h_out_row[ind_layer][ind_conv], (1,1,0,0), "replicate")
-                    #padding_variable_v_out_row[ind_layer][ind_conv] = padding_variable_v_out_row[ind_layer][ind_conv].to(device)
-                    i = min(ind_layer,args.n_layers_G-1)
-                    res = (2**i)*args.base_res
+    # Build the inputs to the generator z and maps
+    z_sub_images = build_z(num_images,z_dim,base_res,num_patches_height, num_patches_width,total_num_patches_height, total_num_patches_width,device='cpu')
+    if type_norm == 'SSM':
+        map_sub_images = build_maps(num_images,map_dim,n_layers_G,base_res,num_patches_height, num_patches_width,total_num_patches_height, total_num_patches_width,device)
+    
+    # Iterate through the generator with to generate the sub_images in sequence 
+    # and concatente the sub_images to form the full image
+    
+    last_row_ind = steps_h-1
+    last_column_ind = steps_w-1
 
-                    res_withpadd_w = args.num_patches_w*res +2
-                    res_withpadd_h = 1
-                    #print(res_withpadd_w)
-                    #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
-                    padding_variable_h_out_conv = crop_images(padding_variable_h_out_row[ind_layer][ind_conv],
-                                                                   res_withpadd_h,res_withpadd_w,(args.num_patches_w-1)*res,device = 'cpu')
-                    #print(padding_variable_h_out_conv.shape)
-                    #for instance in padding_variable_v_out_conv:
-                    conv_list.append(padding_variable_h_out_conv)
-                padding_variable_h_out_conv_all.append(conv_list)
-        
-        
-            #print(padding_variable_h_out_conv.shape)            
-            N_patches = padding_variable_h_out_conv.shape[0]
-            #padding_variable_h_out_conv_all is a list of N_blocks = 7 each has N_patches instances of the same size
-            N_blocks = len(padding_variable_h_out_conv_all) 
-            #print(len(padding_variable_h_out_conv_all[0]))
-            #print(N_patches,N_blocks)
-            padding_variable_h_in_row = [] # list of padding_variable_h_in for every iteration in steps_w
-            for j in range(N_patches):
-                L1 = []
-                for i in range(N_blocks):
-                    conv_list = []
-                    #print(len(padding_variable_h_out_conv_all[i]))
-                    for l_i in padding_variable_h_out_conv_all[i]:
-                        conv_list.append(l_i[[j]])
-                    L1.append(conv_list)
-                padding_variable_h_in_row.append(L1)
-
-            #print(len(padding_variable_h_in_row[0][0]))
-            #print(padding_variable_h_in_row[0][0].shape)
+    sub_image_ind = 0
+    for ind_h in range(steps_h):
+        for ind_w in range(steps_w):
             
-        for s_j in range(steps_w):
+            # Update the location of the generated image. Note that the first row could also be the last column
+            if last_row_ind ==0:
+                image_location = '1st_row_last_row'
+            elif ind_h == 0:
+                image_location = '1st_row'
+            elif ind_h == last_row_ind :
+                image_location = 'last_row'
+            else:
+                image_location = 'inter_row'
+            
+            if last_column_ind ==0:
+                image_location += '_1st_col_last_col'
+            elif ind_w ==0:
+                image_location += '_1st_col'
+            elif ind_w == last_column_ind :
+                image_location += '_last_col'
+            else:
+                image_location += '_inter_col'
             
             
-            # Get z
-            res_withpadd = args.base_res + pad_size_z
-            z = crop_images(z_local[[n]],res_withpadd,res_withpadd,args.base_res,device = device)
+            # Get z input for the current sub_image and crop it into patches
+            z_sub_image = z_sub_images[[sub_image_ind]].to(device)
+            z_patches = crop_images(z_sub_image,base_res,base_res,base_res,device = device)
             
-            
-            # Get map
-            maps_per_res = []
-            for i in range(0,args.n_layers_G):
-                res1 = (2**i)*args.base_res
-                res_withpadd = res1 + pad_size_maps
-                maps = crop_images(maps_local_per_res[i][[n]],res_withpadd,res_withpadd,res1,device = device)
-                maps_per_res.append(maps)
-            y_G = maps_per_res 
-            
-            # check if the patch is the last one in the row
-            last = True if s_j == steps_w-1 else False
-            
-            if padding_variable_h_in_row is not None:
-                #print(s_i,s_j)
-                padding_variable_h_in = padding_variable_h_in_row[s_j]
-                
-                for ind_layer,layer_out in enumerate(padding_variable_h_in):
-                    for ind_conv,conv_out in enumerate(layer_out):
-                        padding_variable_h_in[ind_layer][ind_conv] = padding_variable_h_in[ind_layer][ind_conv].to(device)
+            # Get map input for the current sub_image and crop it into patches
+            if type_norm == 'SSM':
+                map_pacthes = []
+                for i in range(0,n_layers_G):
+                    res_layer = (2**i)*base_res
+                    pad_size = 4
+                    maps = crop_images(map_sub_images[i][[sub_image_ind]],res_layer+pad_size,res_layer+pad_size,res_layer,device = device)
+                    map_pacthes.append(maps)
+            else:
+                map_pacthes =  [None] * n_layers_G
                     
-            
+            # Pass the input to the model to get patch_i
             with torch.no_grad():
-                fake,padding_variable_v_out,padding_variable_h_out = netG(z, y_G,args.num_patches_h,args.num_patches_w
-                                                                    ,padding_variable_h= padding_variable_h_in,padding_variable_v= padding_variable_v_in
-                                                                    ,last = last)
+                patches_i = netG(z_patches,map_pacthes,image_location)
             
-            # for the next iteration padding_variable_v_in = padding_variable_v_out
-            padding_variable_v_in = padding_variable_v_out
-            #print(len(padding_variable_v_in[0][0].shape))
+            # Concatenate the patches to form a a sub_image
+            sub_image_i = merge_patches_into_image(patches_i,num_patches_height,num_patches_width,device).cpu()
             
-            #padding_variable_h_out = padding_variable_h_out.cpu()
-            #torch.cuda.empty_cache()
-            
-            for ind_layer,layer_out in enumerate(padding_variable_h_out):
-                    for ind_conv,conv_out in enumerate(layer_out):
-                        padding_variable_h_out[ind_layer][ind_conv] = padding_variable_h_out[ind_layer][ind_conv].cpu()
-                        torch.cuda.empty_cache()
-
-            
-            # concatenate the padding_variable_h_out to form padding_variable_h_out_row
-            if s_j == 0:
-                padding_variable_h_out_row = padding_variable_h_out
+            # Drop the re-generated patches
+            # Crop the left and bottom patches in the sub_image if it is not in the last row or last column
+            if ind_h != last_row_ind and ind_w !=last_column_ind:
+                sub_image_i_cropped = sub_image_i[:,:,0:generator_patch_resolution*(num_patches_height-1),0:generator_patch_resolution*(num_patches_width-1)]
+                
+            # Crop only the bottom patches in the sub_image if it is in the last column and not in the last row
+            elif ind_h != last_row_ind:
+                sub_image_i_cropped = sub_image_i[:,:,0:generator_patch_resolution*(num_patches_height-1),:]
+                
+            # Crop only the left patches in the sub_image if it is in the last row and not in the last column
+            elif ind_w !=last_column_ind:
+                sub_image_i_cropped = sub_image_i[:,:,:,0:generator_patch_resolution*(num_patches_width-1)]
+                
+            # Otherwise do not crop the image
             else:
-                for ind_layer,layer_out in enumerate(padding_variable_h_out):
-                    for ind_conv,conv_out in enumerate(layer_out):
-                        #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
-                        #padding_variable_v_out_row[ind_layer][ind_conv] = padding_variable_v_out_row[ind_layer][ind_conv].cpu()
-                        padding_variable_h_out_row[ind_layer][ind_conv] = torch.cat((padding_variable_h_out_row[ind_layer][ind_conv]
-                                                                                     ,conv_out.cpu()),-1)
-                        #print(padding_variable_h_out_row[ind_layer][ind_conv].shape)
-
+                sub_image_i_cropped = sub_image_i
+                    
+            # Update the index for the next sub_image
+            sub_image_ind = sub_image_ind+1
                         
-            fake = fake.cpu() # (9,_,_,_)
-            torch.cuda.empty_cache()
-            
-            # concatenate the generated patches
-            img_merged = merge_patches_into_image(fake,args.num_patches_h,args.num_patches_w,'cpu') # (1,_,3*,3*)
-            #torch.save(img_merged, str(j)+'img.pt')
-            #print(img_merged.shape)
-
-            # drop the patched to be re-generated
-            
-            if s_j != steps_w-1 and s_i != steps_h-1: # not last in row or column
-                img_merged = img_merged[:,:,0:gen_res*(args.num_patches_h-1),0:gen_res*(args.num_patches_w-1)]
-            elif s_i != steps_h-1: # last column not last row
-                img_merged = img_merged[:,:,0:gen_res*(args.num_patches_h-1),:]
-            elif s_j != steps_w-1: # last row not last column
-                img_merged = img_merged[:,:,:,0:gen_res*(args.num_patches_w-1)]
-                
-
-            
-            if s_j ==0:
-                full_img_row = img_merged
+            # Concatenate the sub images together to form a row
+            if '1st_col' in image_location:
+                image_row = sub_image_i_cropped
             else:
-                full_img_row = torch.cat((full_img_row,img_merged),-1)
+                image_row = torch.cat((image_row,sub_image_i_cropped),-1)
                 
-            n = n+1
-        
-        if s_i == 0:
-            full_img = full_img_row
+        # Concatenate the rows together to form the full image
+        if '1st_row' in image_location:
+            full_image = image_row
         else:
-            full_img = torch.cat((full_img,full_img_row),-2)
+            full_image = torch.cat((full_image,image_row),-2)
             
-    del padding_variable_h_in,padding_variable_v_in,padding_variable_v_out,padding_variable_h_out
+    # Adjust the generated image to match the target size if it is larger
+    full_image = full_image[:,:,:output_resolution_height,:output_resolution_width] 
     
-    torch.cuda.empty_cache()
+    return full_image
+    
+    
+    
 
-    return full_img
+def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num_images=1, num_patches_height=3, num_patches_width=3,device ='cpu'): 
+    """  
+        Generate images using the generator network netG in a patch-by-patch fashion during training.
+
+        Args:
+            generator (torch.nn.Module): The generator network used for image synthesis.
+            num_images (int): Number of synthetic images to generate (default is 1).
+            num_patches_height (int): Number of patches along the height dimension of the image (default is 3).
+            num_patches_width (int): Number of patches along the width dimension of the image (default is 3).
+            device (str): Device on which to perform the generation (default is 'cpu').
+
+        Returns:
+            torch.Tensor: Tensor containing the generated images with shape (num_images, C, H, W), 
+            where H = num_patches_height*generator.base_res, W=num_patches_width*generator.base_res
+        """
+        
+    if isinstance(netG, nn.DataParallel): 
+        n_layers_G =  netG.module.n_layers_G
+        type_norm = netG.module.type_norm
+    else:
+        n_layers_G =  netG.n_layers_G
+        type_norm = netG.type_norm
+        
+    num_patches_per_image = num_patches_height*num_patches_width
+    generator_batch_size = num_patches_per_image*num_images
+        
+    #Build the spatial latent input z 
+    z = torch.randn(generator_batch_size,z_dim,base_res,base_res).to(device)
+
+    #Build the second input M for stochastic spatial modulation
+    if type_norm == 'SSM':
+        maps_per_layers = []
+        pad_size = 4
+        for i in range(0,n_layers_G):
+            res_layer = (2**i)*base_res
+            res_with_pad = res_layer+pad_size
+            
+            # Build the spatial map input with a pad of size 4, since we use two 3x3 conv layers, for num_images N : (N,mdim ,Tot_layer_res_h +2, Tot_layer_res_w+2)
+            maps_images =  torch.randn(num_images,map_dim,num_patches_height*res_layer+pad_size,num_patches_width*res_layer+pad_size).to(device)
+            
+            # Crop the maps_images input into smaller overlapping patches of size res_layer + 4 with an overlap size of 4:  (N*num_patches_per_img,mdim ,res_layer +4, res_layer+4)
+            maps_patches = crop_images(maps_images,res_with_pad,res_with_pad,res_layer,device = device)
+            
+            maps_per_layers.append((maps_patches))
+    else:
+        maps_per_layers = [None]*n_layers_G
+    
+    fake_images_patches = netG(z, maps_per_layers,image_location = '1st_row_1st_col')
+    
+    fake_images = merge_patches_into_image(fake_images_patches,num_patches_height,num_patches_width,device)
+    
+    return fake_images
 
 
 def merge_patches_into_image(patches, num_rows=3, num_cols=3, device='cpu'):
@@ -718,17 +637,3 @@ def init_weight(m):
     elif classname.find('Embedding') != -1:
         nn.init.orthogonal_(m.weight, gain=1)
        
-class _CustomDataParallel(nn.DataParallel):
-    def __init__(self,model,gpu_ids):
-        super(nn.DataParallel, self).__init__()
-        self.model = nn.DataParallel(model,gpu_ids).cuda()
-        
-        
-    def forward(self, *input):
-        return self.model(*input)
-    
-    def __getattr__(self, name):
-        try:
-            return super().__getattr__(name)
-        except AttributeError:
-            return getattr(self.model.module, name)

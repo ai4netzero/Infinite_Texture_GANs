@@ -1,10 +1,5 @@
-''' train
-   This script train a generative model '''
-#import argparse
 import random
-#import sys
 import time
-
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -12,7 +7,7 @@ import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
 
-from utils import prepare_data,prepare_device,prepare_filename,prepare_models,prepare_parser,prepare_seed,elapsed_time,_CustomDataParallel,sample_from_gen_PatchByPatch
+from utils import prepare_data,prepare_device,prepare_filename,prepare_models,prepare_parser,prepare_seed,elapsed_time, sample_from_gen_PatchByPatch_train
 
 def train(args):
     
@@ -27,6 +22,8 @@ def train(args):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     np.random.seed(seed)
+    
+    print(args)
     
     # Training loaders
     dataloader,train_data = prepare_data(args)
@@ -136,7 +133,7 @@ def train(args):
                 
                 # Update with fake data, Term 2: max 𝔼_(𝑧,𝑀) [log⁡〖(1−𝐷(𝑋)〗)]
 
-                fake_x = sample_from_gen_PatchByPatch(netG,args.z_dim,args.base_res,args.map_dim,num_images=args.num_images,
+                fake_x = sample_from_gen_PatchByPatch_train(netG,args.z_dim,args.base_res,args.map_dim,num_images=args.num_images,
                                                       num_patches_height=args.num_patches_height,num_patches_width=args.num_patches_width,device=device)
 
                     
