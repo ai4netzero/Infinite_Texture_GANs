@@ -36,7 +36,7 @@ To train the GANs model, run the following command
 (Note that it is recommended to use BN instead of SSM for most texture as it is much faster and don't produce artefacts):
 
 ```
-python train.py --data_path datasets/241.jpg --attention --leak_G 0.02 --sampling 8000 --spec_norm_D --padding_mode local --outer_padding replicate   --random_crop 192 --saving_rate 50  --epochs 2 --type_norm bn  --smooth --ema  --num_gpus 4 --gpu_list 0 1 2 3 --fname results/241_lp_bn_replicate_outerpadding
+python train.py --data_path datasets/241.jpg --attention --leak_G 0.02 --sampling 8000 --spec_norm_D --padding_mode local --outer_padding replicate   --random_crop 192 --saving_rate 50  --epochs 300 --type_norm BN  --smooth --ema  --num_gpus 4 --gpu_list 0 1 2 3 --fname results/241_lp_bn_replicate_outerpadding
 ```
 
 To run the model with SSM set  ``` --type_norm SSM ```
