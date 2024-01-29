@@ -15,21 +15,21 @@ class conv2d_lp(nn.Module):
         ch_out (int): number of output channels
         local_padder (nn.Module): Local padding class or None if no local padding is used (in this case zero padding is used)
     """
-    def __init__(self, ch_in, ch_out,SN = False):
+    def __init__(self, ch_in, ch_out,SN = False,padding_mode = 'zeros'):
         super(conv2d_lp, self).__init__()
+        self.padding_mode = padding_mode
         
-        self.local_padder = LocalPadder()
-        
-        if self.local_padder is None:
-            self.conv = conv3x3(ch_in,ch_out,SN,1,1)
-        else:
+        if padding_mode == 'local':
+            self.local_padder = LocalPadder()
             self.conv = conv3x3(ch_in,ch_out,SN,1,0)
+        else:
+            self.conv = conv3x3(ch_in,ch_out,SN,1,1)
 
     def forward(self, x, image_location= '1st_row_1st_col'):
         
-        if self.local_padder:
+        if self.padding_mode == 'local':
             x= self.local_padder(x,image_location)
-                    
+                        
         x = self.conv(x)
         
         return x
@@ -242,7 +242,7 @@ class Attention(nn.Module):
         return self.gamma*o + inputs
     
 class ResBlockGenerator(nn.Module):
-    def __init__(self,generator,in_channels, out_channels,hidden_channels=None):
+    def __init__(self,generator,in_channels, out_channels,hidden_channels=None,padding_mode = 'zeros'):
         super(ResBlockGenerator, self).__init__()
         
         hidden_channels = out_channels if hidden_channels is None else hidden_channels
@@ -253,8 +253,8 @@ class ResBlockGenerator(nn.Module):
         self.map_dim = generator.map_dim
         self.SN = generator.SN
         
-        self.conv1 = conv2d_lp(in_channels,hidden_channels,self.SN).apply(utils.init_weight)
-        self.conv2 = conv2d_lp(hidden_channels,out_channels,self.SN).apply(utils.init_weight)
+        self.conv1 = conv2d_lp(in_channels,hidden_channels,self.SN,padding_mode).apply(utils.init_weight)
+        self.conv2 = conv2d_lp(hidden_channels,out_channels,self.SN,padding_mode).apply(utils.init_weight)
         
         if self.learnable_sc:
             self.conv3 = conv1x1(in_channels,out_channels,SN=self.SN).apply(utils.init_weight)

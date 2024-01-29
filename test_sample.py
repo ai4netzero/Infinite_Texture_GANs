@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--output_resolution_height', type=int, default=384,help = 'output_resolution_height')
 parser.add_argument('--output_resolution_width', type=int, default= 384,help = 'output_resolution_width')
 parser.add_argument('--output_name', type=str, default= '241_generated.jpg',help = 'name of the generated image ')
-parser.add_argument('--model_path', type=str, default= '241_lp_bn_clean/300_200.pth',help = 'path of the generator network')
+parser.add_argument('--model_path', type=str, default= 'results/241_lp_bn_outerpadRepl/300_200.pth',help = 'path of the generator network')
 
 args_sample = parser.parse_args()          
 
@@ -42,7 +42,6 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #filename = '../Exps/wall_v2/241_D_patch_dch64_nld4_G_patch2D_gch52_nlg6_npatches3x3_randomcrop192_n_cl1_originalspade_overlappad4_indmaps_overlappadconv_residual_FCG'
 #filename = '241_lp_bn_clean/'
 #filename = '../Exps/241_lp_bn_outerpadRepl/'
-#filename = '../Exps/241_lp_SSM_outerpadRepl'
 filename = args_sample.model_path
 checkpoint = torch.load(filename,map_location='cpu')
 
@@ -53,7 +52,7 @@ state_dict_G = checkpoint['netG_state_dict']
 
 netG = generators.ResidualPatchGenerator(z_dim = args.z_dim,G_ch = args.G_ch,base_res=args.base_res,n_layers_G = args.n_layers_G,attention=args.attention,
                                          img_ch= args.img_ch,leak = args.leak_G,SN = False,type_norm = args.type_norm_G,map_dim = 1,
-                                         padding_mode = 'local',outer_padding = args.outer_padding,
+                                         padding_mode = args.padding_mode,outer_padding = args.outer_padding,
                                          num_patches_h = 3,num_patches_w=3,padding_size = 1,conv_reduction = 2).to(device)
 
 

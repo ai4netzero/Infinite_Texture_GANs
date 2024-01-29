@@ -54,21 +54,21 @@ class ResidualPatchGenerator(nn.Module):
         else:
             self.activation = nn.ReLU()  
         
-        self.start = conv2d_lp(self.z_dim,self.base_ch*8)
+        self.start = conv2d_lp(self.z_dim,self.base_ch*8,SN,padding_mode)
         
-        self.block1 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*8)
-        self.block2 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*4)
-        self.block3 = ResBlockGenerator(self,self.base_ch*4, self.base_ch*2)
-        self.block4 = ResBlockGenerator(self,self.base_ch*2, self.base_ch)   
+        self.block1 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*8,padding_mode=padding_mode)
+        self.block2 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*4,padding_mode=padding_mode)
+        self.block3 = ResBlockGenerator(self,self.base_ch*4, self.base_ch*2,padding_mode=padding_mode)
+        self.block4 = ResBlockGenerator(self,self.base_ch*2, self.base_ch,padding_mode=padding_mode)   
              
         # To generate sizes of 16x the base_res 
         if self.n_layers_G>=5:
             final_chin = self.base_ch//2
-            self.block5 = ResBlockGenerator(self,self.base_ch, self.base_ch//2)
+            self.block5 = ResBlockGenerator(self,self.base_ch, self.base_ch//2,padding_mode=padding_mode)
             # To generate sizes of 32x the base_res 
             if self.n_layers_G == 6:
                 final_chin = self.base_ch//4
-                self.block6 = ResBlockGenerator(self,self.base_ch//2, self.base_ch//4)
+                self.block6 = ResBlockGenerator(self,self.base_ch//2, self.base_ch//4,padding_mode=padding_mode)
         else:
             final_chin = self.base_ch
 
@@ -78,7 +78,7 @@ class ResidualPatchGenerator(nn.Module):
         if self.attention:
             self.attention = Attention(self.base_ch*2,SN=SN)
     
-        self.final = conv2d_lp(final_chin,self.img_ch)
+        self.final = conv2d_lp(final_chin,self.img_ch,SN,padding_mode)
         
 
     def forward(self, z,maps=None,image_location = '1st_row_1st_col'):
