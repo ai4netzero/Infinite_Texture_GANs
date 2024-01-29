@@ -66,7 +66,7 @@ def prepare_parser():
     parser.add_argument('--padding_mode', type=str, default='zeros'
                        ,help = 'padding used in G either zeros or local')
     parser.add_argument('--type_norm_G', type=str, default='BN'
-                       ,help = 'type normalization used in G either bn or SSM')
+                       ,help = 'type normalization used in G either BN or SSM')
 
     # optimizers settings
     parser.add_argument('--lr_G', type=float, default=2e-4

@@ -109,7 +109,7 @@ class ResidualPatchGenerator(nn.Module):
             h = self.up(h) # 32x
             h = self.block6(h, maps[5],image_location)
 
-        if self.type_norm == 'bn':
+        if self.type_norm == 'BN':
             h = self.bn(h)
             
         h = self.activation(h)
