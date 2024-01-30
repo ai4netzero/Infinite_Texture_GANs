@@ -1,11 +1,6 @@
 import argparse
-import numpy as np
 import torch
-import matplotlib.pyplot as plt
-import sys
-import time
 from collections import OrderedDict
-import os 
 from torchvision.utils import save_image
 
 from  utils import sample_from_gen_PatchByPatch_test
@@ -23,9 +18,9 @@ parser.add_argument('--model_path', type=str, default= 'results/241_lp_bn_outerp
 
 args_sample = parser.parse_args()          
 
+
 def load_G(state_dict_G,netG):
     new_state_dict_G = OrderedDict()
-
     for k, v in state_dict_G.items():
         if 'module' in k:
             k = k.replace('module.','')
@@ -39,7 +34,6 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 filename = args_sample.model_path
-#filename = '../Exps/wall_v2/241_D_patch_dch64_nld4_G_patch2D_gch52_nlg6_npatches3x3_randomcrop192_n_cl1_originalspade_overlappad4_indmaps_overlappadconv_residual_FCG/600_250.pth'
 
 checkpoint = torch.load(filename,map_location='cpu')
 
@@ -53,6 +47,8 @@ netG = generators.ResidualPatchGenerator(z_dim = args.z_dim,G_ch = args.G_ch,bas
                                          num_patches_h = 3,num_patches_w=3,padding_size = 1,conv_reduction = 2).to(device)
 
 
+     
+#print(netG)
 
 netG = load_G(state_dict_G,netG)
 
