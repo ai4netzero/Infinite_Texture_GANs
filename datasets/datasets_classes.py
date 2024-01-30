@@ -5,6 +5,8 @@ import os
 import numpy as np
 from PIL import Image
 from random import sample
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class single_image(Dataset):

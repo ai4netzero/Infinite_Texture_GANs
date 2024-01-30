@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--output_resolution_height', type=int, default=384,help = 'output_resolution_height')
 parser.add_argument('--output_resolution_width', type=int, default= 384,help = 'output_resolution_width')
 parser.add_argument('--output_name', type=str, default= '241_generated.jpg',help = 'name of the generated image ')
-parser.add_argument('--model_path', type=str, default= 'results/241_lp_bn_outerpadRepl/300_200.pth',help = 'path of the generator network')
+parser.add_argument('--model_path', type=str, default= 'results/241_lp_bn_outerpadRepl/300__ema.pth',help = 'path of the generator network')
 
 args_sample = parser.parse_args()          
 
@@ -39,6 +39,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 filename = args_sample.model_path
+filename = '../Exps/wall_v2/241_D_patch_dch64_nld4_G_patch2D_gch52_nlg6_npatches3x3_randomcrop192_n_cl1_originalspade_overlappad4_indmaps_overlappadconv_residual_FCG/600_250.pth'
+
 checkpoint = torch.load(filename,map_location='cpu')
 
 args = checkpoint['args']
