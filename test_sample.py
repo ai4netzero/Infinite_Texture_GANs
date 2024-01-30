@@ -39,7 +39,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 filename = args_sample.model_path
-filename = '../Exps/wall_v2/241_D_patch_dch64_nld4_G_patch2D_gch52_nlg6_npatches3x3_randomcrop192_n_cl1_originalspade_overlappad4_indmaps_overlappadconv_residual_FCG/600_250.pth'
+#filename = '../Exps/wall_v2/241_D_patch_dch64_nld4_G_patch2D_gch52_nlg6_npatches3x3_randomcrop192_n_cl1_originalspade_overlappad4_indmaps_overlappadconv_residual_FCG/600_250.pth'
 
 checkpoint = torch.load(filename,map_location='cpu')
 
