@@ -191,7 +191,7 @@ def train(args):
         D_losses.append(D_running_loss)
 
         # saving model checkpoints
-        if args.saving_rate is not None and (epoch+1%args.saving_rate ==0 or epoch+1 == args.epochs)  :
+        if args.saving_rate is not None and ((epoch+1)%args.saving_rate ==0 or (epoch+1) == args.epochs)  :
             torch.save({
                         'epoch': epoch+1,
                         'netG_state_dict': netG.state_dict(),

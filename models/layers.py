@@ -42,18 +42,18 @@ class LocalPadder(nn.Module):
         Args:
             num_patches_h (int): Number of patches along the height dimension (default is 3).
             num_patches_w (int): Number of patches along the width dimension (default is 3).
-            outer_padding (str): Padding mode for outer patches (default is 'constant').
+            outer_padding (str): Padding mode for outer patches (default is 'replicate').
             padding_size (int): Padding size for each patch (default is 1).
             conv_reduction (int): Reduction factor in spatial size after convolution (default is 2 for 3x3 conv).
         """
     num_patches_h = 3
     num_patches_w = 3
-    outer_padding = 'constant'
+    outer_padding = 'replicate'
     padding_size = 1
     conv_reduction = 2
         
     @classmethod
-    def set_attributes(cls,num_patches_h = 3,num_patches_w =3,outer_padding = 'constant',padding_size =1,conv_reduction = 2):
+    def set_attributes(cls,num_patches_h = 3,num_patches_w =3,outer_padding = 'replicate',padding_size =1,conv_reduction = 2):
         cls.num_patches_h = num_patches_h
         cls.num_patches_w = num_patches_w
         cls.outer_padding = outer_padding

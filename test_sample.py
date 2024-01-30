@@ -38,16 +38,12 @@ def load_G(state_dict_G,netG):
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-
-#filename = '../Exps/wall_v2/241_D_patch_dch64_nld4_G_patch2D_gch52_nlg6_npatches3x3_randomcrop192_n_cl1_originalspade_overlappad4_indmaps_overlappadconv_residual_FCG'
-#filename = '241_lp_bn_clean/'
 filename = args_sample.model_path
 checkpoint = torch.load(filename,map_location='cpu')
 
 args = checkpoint['args']
 state_dict_G = checkpoint['netG_state_dict']   
 
-#print(args)
 
 netG = generators.ResidualPatchGenerator(z_dim = args.z_dim,G_ch = args.G_ch,base_res=args.base_res,n_layers_G = args.n_layers_G,attention=args.attention,
                                          img_ch= args.img_ch,leak = args.leak_G,SN = False,type_norm = args.type_norm_G,map_dim = 1,

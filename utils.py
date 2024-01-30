@@ -107,7 +107,7 @@ def prepare_parser():
                         ,help ='Number of patches along the width dimension of the image')
     parser.add_argument('--num_patches_height', type=int, default=3
                         ,help ='Number of patches along the height dimension of the image')                      
-    parser.add_argument('--outer_padding', type=str, default='constant'
+    parser.add_argument('--outer_padding', type=str, default='replicate'
                         ,help='padding used in the borders of the outer patches either replicate or constant for zero padding')
     parser.add_argument('--padding_size', type=int, default=1
                         ,help ='padding size used in local padding')
