@@ -14,12 +14,12 @@ class conv2d_lp(nn.Module):
         SN: (bool): use spectral normalization if True
         padding_mode (str): padding mode used in the convolution either zeros or local
     """
-    def __init__(self, ch_in, ch_out,SN = False,padding_mode = 'zeros'):
+    def __init__(self, ch_in, ch_out,SN = False,padding_mode = 'zeros',merge_patches_into_image = True):
         super(conv2d_lp, self).__init__()
         self.padding_mode = padding_mode
         
         if padding_mode == 'local':
-            self.local_padder = LocalPadder()
+            self.local_padder = LocalPadder(merge_patches_into_image)
             self.conv = conv3x3(ch_in,ch_out,SN,1,0)
         else:
             self.conv = conv3x3(ch_in,ch_out,SN,1,1)
@@ -60,8 +60,10 @@ class LocalPadder(nn.Module):
         cls.padding_size = padding_size
         cls.conv_reduction = conv_reduction
 
-    def __init__(self):
+    def __init__(self,merge_patches_into_image = 'True'):
         super(LocalPadder, self).__init__()
+        
+        self.merge_patches_into_image = merge_patches_into_image
         
         # Initialize the padding variables to None
         self.vertical_padding_variable = None
@@ -140,17 +142,26 @@ class LocalPadder(nn.Module):
                 
     def forward(self, input,image_location='1st_row_1st_col'):
      
-     
         _,_,H,W = input.size()
-        merged_input = utils.merge_patches_into_image(input,self.num_patches_h,self.num_patches_w,input.device) # (_,_,3W,3H)
+        # Merge patches into an image
+        if self.merge_patches_into_image:
+            merged_input = utils.merge_patches_into_image(input,self.num_patches_h,self.num_patches_w,input.device) # (_,_,3W,3H)
+        # If the input is merged then get the patch size
+        else:
+            H = H//self.num_patches_h
+            W = W//self.num_patches_w
+            merged_input = input
+    
            
         # During inference only
         # Extract vertical and horizontal padding variables to be used for the next generation steps 
         if not self.training:
             self.update_padding_variables(merged_input,image_location,H,W)
-        
+            
         # Apply outer padding to the merged input as well as pad with stored padding variables from previous generation steps
-        merged_input = self.padding(merged_input,image_location)
+        # Do not apply to the input Z as it is already padded with random values.
+        if self.merge_patches_into_image:
+            merged_input = self.padding(merged_input,image_location)
 
         # Perform cropping after padding to get the patches back, the cropping is done with an overlap to ensure local padding
         res_with_padding = W +self.padding_size*self.conv_reduction

@@ -426,7 +426,9 @@ def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num
     generator_batch_size = num_patches_per_image*num_images
         
     #Build the spatial latent input z 
-    z = torch.randn(generator_batch_size,z_dim,base_res,base_res).to(device)
+    pad_size = 2
+    z_images =  torch.randn(num_images,z_dim,num_patches_height*base_res+pad_size,num_patches_width*base_res+pad_size).to(device)
+    z_patches = crop_images(z_images,base_res+pad_size,base_res+pad_size,base_res,device = device)
 
     #Build the second input M for stochastic spatial modulation
     if type_norm == 'SSM':
@@ -446,7 +448,7 @@ def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num
     else:
         maps_per_layers = [None]*n_layers_G
     
-    fake_images_patches = netG(z, maps_per_layers,image_location = '1st_row_1st_col')
+    fake_images_patches = netG(z_patches, maps_per_layers,image_location = '1st_row_1st_col')
     
     fake_images = merge_patches_into_image(fake_images_patches,num_patches_height,num_patches_width,device)
     

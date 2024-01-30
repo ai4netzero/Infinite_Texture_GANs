@@ -56,7 +56,7 @@ class ResidualPatchGenerator(nn.Module):
         else:
             self.activation = nn.ReLU()  
         
-        self.start = conv2d_lp(self.z_dim,self.base_ch*8,SN,padding_mode)
+        self.start = conv2d_lp(self.z_dim,self.base_ch*8,SN,padding_mode,merge_patches_into_image = False)
         
         self.block1 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*8,padding_mode=padding_mode)
         self.block2 = ResBlockGenerator(self,self.base_ch*8, self.base_ch*4,padding_mode=padding_mode)
