@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim as optim
+from torchvision.utils import save_image
 
 from utils import prepare_data,prepare_device,prepare_filename,prepare_models,prepare_parser,prepare_seed,elapsed_time, sample_from_gen_PatchByPatch_train
 
@@ -115,6 +116,9 @@ def train(args):
             # Fetch the real data
             real_x = data[0].to(device)
             b_size = real_x.size(0)
+            
+            #save_image(real_x[0]*0.5+0.5,'real.jpg')
+            #exit()
             
             # Update D network
             # # max⁡〖𝔼_𝑦 [log⁡〖𝐷(𝑦)〗] +  𝔼_(𝑧,𝑀) [log⁡〖(1−𝐷(𝑋)〗)]〗   

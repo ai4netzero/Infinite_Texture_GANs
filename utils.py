@@ -217,16 +217,16 @@ def prepare_filename(args):
 
 def build_z(num_images=1,z_dim=128,base_res=4,num_patches_height=3, num_patches_width=3,total_num_patches_height=3, total_num_patches_width=3,device='cpu'):
     
-    
-    image_base_height = total_num_patches_height*base_res
-    image_base_width = total_num_patches_width*base_res
+    pad_size = 2
+    image_base_height = total_num_patches_height*base_res+pad_size
+    image_base_width = total_num_patches_width*base_res+pad_size
     
     # Build the spatial latent input z for the full image
     z_full_image = torch.randn(num_images,z_dim,image_base_height,image_base_width).to(device)
     
     # Crop the z input into overlapping sub-image each has resolution of (num_patches_height*base_res,num_patches_width*base_res)
     # The overlap is of size base_res and is needed to regenerate the outer patches in the next steps with appopriate padding
-    z_sub_image = crop_images(z_full_image,num_patches_height*base_res,num_patches_width*base_res,(num_patches_width-1)*base_res,device = device)
+    z_sub_image = crop_images(z_full_image,num_patches_height*base_res+pad_size,num_patches_width*base_res+pad_size,(num_patches_width-1)*base_res,device = device)
     
     return z_sub_image
 
@@ -336,7 +336,7 @@ def sample_from_gen_PatchByPatch_test(netG,z_dim=128,base_res=4,map_dim = 1,num_
             
             # Get z input for the current sub_image and crop it into patches
             z_sub_image = z_sub_images[[sub_image_ind]].to(device)
-            z_patches = crop_images(z_sub_image,base_res,base_res,base_res,device = device)
+            #z_patches = crop_images(z_sub_image,base_res,base_res,base_res,device = device)
             
             # Get map input for the current sub_image and crop it into patches
             if type_norm == 'SSM':
@@ -351,7 +351,7 @@ def sample_from_gen_PatchByPatch_test(netG,z_dim=128,base_res=4,map_dim = 1,num_
                     
             # Pass the input to the model to get patch_i
             with torch.no_grad():
-                patches_i = netG(z_patches,map_pacthes,image_location)
+                patches_i = netG(z_sub_image,map_pacthes,image_location)
             
             # Concatenate the patches to form a a sub_image
             sub_image_i = merge_patches_into_image(patches_i,num_patches_height,num_patches_width,device).cpu()
@@ -428,7 +428,6 @@ def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num
     #Build the spatial latent input z 
     pad_size = 2
     z_images =  torch.randn(num_images,z_dim,num_patches_height*base_res+pad_size,num_patches_width*base_res+pad_size).to(device)
-    z_patches = crop_images(z_images,base_res+pad_size,base_res+pad_size,base_res,device = device)
 
     #Build the second input M for stochastic spatial modulation
     if type_norm == 'SSM':
@@ -448,7 +447,7 @@ def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num
     else:
         maps_per_layers = [None]*n_layers_G
     
-    fake_images_patches = netG(z_patches, maps_per_layers,image_location = '1st_row_1st_col')
+    fake_images_patches = netG(z_images, maps_per_layers,image_location = '1st_row_1st_col')
     
     fake_images = merge_patches_into_image(fake_images_patches,num_patches_height,num_patches_width,device)
     
