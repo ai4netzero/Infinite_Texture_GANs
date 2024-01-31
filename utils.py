@@ -9,7 +9,7 @@ import torch.utils.data
 import numpy as np
 from math import ceil
 from models.generators import ResidualPatchGenerator
-from models.discriminators import Patch_Discriminator
+from models.discriminators import PatchDiscriminator
 
 def prepare_parser():
     parser = argparse.ArgumentParser()
@@ -200,7 +200,7 @@ def prepare_models(args,device = 'cpu'):
         
 
     if args.D_model == 'patch_GAN':
-        netD = Patch_Discriminator(img_ch=args.img_ch,base_ch = args.D_ch,n_layers_D=args.n_layers_D,kw = 4
+        netD = PatchDiscriminator(img_ch=args.img_ch,base_ch = args.D_ch,n_layers_D=args.n_layers_D,kw = 4
                                     ,SN= args.spec_norm_D,norm_layer = args.norm_layer_D).to(device)
     return netG,netD
 

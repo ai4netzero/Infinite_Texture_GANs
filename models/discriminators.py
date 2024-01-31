@@ -153,7 +153,7 @@ class SN_Discriminator(nn.Module): # paper SNGAN
 
 
 # paper pix2pix,sinGAN(batchnorm), SPADE,pix2pixHD(instancenorm)
-class Patch_Discriminator(nn.Module):
+class PatchDiscriminator(nn.Module):
     
     """PatchGAN discriminator that classifies patches of the image instead of the whole input image.
 
@@ -169,10 +169,9 @@ class Patch_Discriminator(nn.Module):
     """
     
     def __init__(self, img_ch=1,base_ch = 64,n_layers_D=4,kw = 4,SN= False,norm_layer = None):
-        super(Patch_Discriminator, self).__init__()   
+        super(PatchDiscriminator, self).__init__()   
         nf = base_ch
         self.img_ch = img_ch
-        padw = 1
         if kw == 4:
             conv_fun =  conv4x4   
         elif kw==3:

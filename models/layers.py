@@ -12,7 +12,7 @@ class conv2d_lp(nn.Module):
         ch_in (int): number of input channels.
         ch_out (int): number of output channels
         SN: (bool): use spectral normalization if True
-        padding_mode (str): padding modes used in the convolution either zeros or local
+        padding_mode (str): padding mode used in the convolution either zeros or local
     """
     def __init__(self, ch_in, ch_out,SN = False,padding_mode = 'zeros'):
         super(conv2d_lp, self).__init__()
