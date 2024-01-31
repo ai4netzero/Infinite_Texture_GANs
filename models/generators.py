@@ -18,6 +18,8 @@ class ResidualPatchGenerator(nn.Module):
             outer_padding (str): Padding mode for outer patches (default is 'replicate').
             num_patches_h (int): Number of patches along the height dimension (default is 3).
             num_patches_w (int): Number of patches along the width dimension (default is 3).
+            padding_size (int): Padding size for each patch (default is 1).
+            conv_reduction (int): Reduction factor in spatial size after convolution (default is 2 for 3x3 conv).
         """
     
     def __init__(self,z_dim = 128,G_ch = 64,base_res=4,n_layers_G = 4,attention=True,img_ch= 3
@@ -98,9 +100,6 @@ class ResidualPatchGenerator(nn.Module):
             
         h = self.up(h) # 8x
         h = self.block4(h, maps[3],image_location)
-        
-        # Form the output padding variable to be used for the next iteration during inference 
-        #padding_variable_out = [pad_var_start,pad_var_block1,pad_var_block2,pad_var_block3,pad_var_block4]
         
         if self.n_layers_G >=5:
             h = self.up(h) # 16x

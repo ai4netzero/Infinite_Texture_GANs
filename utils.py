@@ -402,6 +402,9 @@ def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num
 
         Args:
             generator (torch.nn.Module): The generator network used for image synthesis.
+            z_dim (int): Dimension of the input latent vector (default is 128).
+            base_res (int): Base resolution of the generated image (default is 4).
+            map_dim (int): Dimension of the maps used in case of SSM (default is 1).
             num_images (int): Number of synthetic images to generate (default is 1).
             num_patches_height (int): Number of patches along the height dimension of the image (default is 3).
             num_patches_width (int): Number of patches along the width dimension of the image (default is 3).

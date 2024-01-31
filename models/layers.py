@@ -11,7 +11,8 @@ class conv2d_lp(nn.Module):
     Args:
         ch_in (int): number of input channels.
         ch_out (int): number of output channels
-        local_padder (nn.Module): Local padding class or None if no local padding is used (in this case zero padding is used)
+        SN: (bool): use spectral normalization if True
+        padding_mode (str): padding modes used in the convolution either zeros or local
     """
     def __init__(self, ch_in, ch_out,SN = False,padding_mode = 'zeros'):
         super(conv2d_lp, self).__init__()
@@ -33,8 +34,7 @@ class conv2d_lp(nn.Module):
         return x
 
 class LocalPadder(nn.Module):
-    """
-        PyTorch implementation of a Local Padder, which performs local padding based on convolutional settings.
+    """ PyTorch implementation of a Local Padder, which performs local padding based on convolutional settings.
         
         First the module merges the small-size patches together, perform outer padding and finally crop the patches with
         the specified overlapping padding size.
