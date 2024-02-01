@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 from random import sample
 from PIL import ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+#ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class single_image(Dataset):
@@ -44,7 +44,6 @@ class single_image(Dataset):
             return 10000
 
     def __getitem__(self, idx):
-
         if self.trans_crop:
             img = self.trans_crop(self.img)
         img = self.transform(img)
