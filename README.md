@@ -31,7 +31,7 @@ datasets/
         241.jpg
 ```
 
-## Usage
+## Training
 To train the GANs model, run the following command 
 (Note that it is recommended to use BN instead of SSM for most texture as it is much faster and don't produce artefacts):
 
@@ -41,9 +41,20 @@ python train.py --data_path datasets/241.jpg --attention --leak_G 0.02 --samplin
 
 To run the model with SSM set  ``` --type_norm SSM ```
 
-Make sure to replace datasets/241.jpg with the path to your image. Adjust other paramters according to your requirements (e.g., you can try to reduce training time by smaller model capacity by setting --n_layers_G 5 --n_layers_D 3).
+Make sure to replace datasets/241.jpg with the path to your image. Adjust other hyper-paramters according to your requirements. Below is some of examples we found to work in some experiments.
 
+ Experiment | Image     | Random Crop | n_layers_G | n_layers_D |
+|------------|-----------|-------------|------------|------------|
+| Experiment 1 | 241.jpg   | 192        | 6         | 4        |
+| Experiment 2 | 34.jpg    | 128       | 5          | 4          |
+
+## Inference
 After training you can use the example notebook "generate_example.ipynb" to generate large arbitrary size texture images using the saved model. 
+Or you can run the test_sample.py file:
+
+```
+python test_sample.py --model_path results/241_lp_BN_replicate_outerpadding_nlg6_nld4_padzstochastic_v2/300_150.pth  --output_resolution_height 1024  --output_resolution_width 1024
+```
 
 ## Acknowledgements
 Please cite the original paper if you use this code for your research
