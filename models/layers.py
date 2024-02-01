@@ -13,6 +13,8 @@ class conv2d_lp(nn.Module):
         ch_out (int): number of output channels
         SN: (bool): use spectral normalization if True
         padding_mode (str): padding mode used in the convolution either zeros or local
+        merge_patches_into_image (bool): if True merge the patches into a full image before you apply cropping with an overlap,
+                                            False if the input is already merged 
     """
     def __init__(self, ch_in, ch_out,SN = False,padding_mode = 'zeros',merge_patches_into_image = True):
         super(conv2d_lp, self).__init__()

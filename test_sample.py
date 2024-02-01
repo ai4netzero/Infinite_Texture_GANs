@@ -5,12 +5,11 @@ from torchvision.utils import save_image
 
 from  utils import sample_from_gen_PatchByPatch_test
 from models import generators
-#sys.path.append("models/")
 
 
 parser = argparse.ArgumentParser()
                   
-# data settings     
+# settings     
 parser.add_argument('--output_resolution_height', type=int, default=384,help = 'output_resolution_height')
 parser.add_argument('--output_resolution_width', type=int, default= 384,help = 'output_resolution_width')
 parser.add_argument('--output_name', type=str, default= '241_generated.jpg',help = 'name of the generated image ')
@@ -48,13 +47,10 @@ netG = generators.ResidualPatchGenerator(z_dim = args.z_dim,G_ch = args.G_ch,bas
 
 
      
-#print(netG)
-
 netG = load_G(state_dict_G,netG)
 
 
 with torch.no_grad():
-    #img = sample_from_gen_PatchByPatch(netG,num_images=1,device=device).cpu()
     img = sample_from_gen_PatchByPatch_test(netG,z_dim = args.z_dim,num_images=1,output_resolution_height=args_sample.output_resolution_height
                                             ,output_resolution_width=args_sample.output_resolution_width,device=device).cpu()
 

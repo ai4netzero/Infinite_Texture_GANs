@@ -421,10 +421,7 @@ def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num
     else:
         n_layers_G =  netG.n_layers_G
         type_norm = netG.type_norm
-        
-    num_patches_per_image = num_patches_height*num_patches_width
-    generator_batch_size = num_patches_per_image*num_images
-        
+                
     #Build the spatial latent input z 
     pad_size = 2
     z_images =  torch.randn(num_images,z_dim,num_patches_height*base_res+pad_size,num_patches_width*base_res+pad_size).to(device)
