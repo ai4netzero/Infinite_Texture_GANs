@@ -182,7 +182,7 @@ def prepare_data(args):
 
     dataloader = torch.utils.data.DataLoader(train_data,
                        shuffle=True, batch_size=args.batch_size,
-                       num_workers=0)
+                       num_workers=2)
 
     print("Finished data loading")    
     return dataloader,train_data
@@ -450,6 +450,36 @@ def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num
     
     return fake_images
 
+
+def sample_from_gen(netG,z_dim=128,base_res=4,num_images=1,device ='cpu'): 
+    """  
+        Generate images using the generator network netG in a patch-by-patch fashion during training.
+
+        Args:
+            generator (torch.nn.Module): The generator network used for image synthesis.
+            z_dim (int): Dimension of the input latent vector (default is 128).
+            base_res (int): Base resolution of the generated image (default is 4).
+            num_images (int): Number of synthetic images to generate (default is 1).
+            device (str): Device on which to perform the generation (default is 'cpu').
+
+        Returns:
+            torch.Tensor: Tensor containing the generated images with shape (num_images, C, H, W), 
+            where H = num_patches_height*generator.base_res, W=num_patches_width*generator.base_res
+        """
+        
+    if isinstance(netG, nn.DataParallel): 
+        n_layers_G =  netG.module.n_layers_G
+    else:
+        n_layers_G =  netG.n_layers_G
+                
+    #Build the spatial latent input z 
+    z_images =  torch.randn(num_images,z_dim,base_res,base_res).to(device)
+
+    maps_per_layers = [None]*n_layers_G
+    
+    fake_images = netG(z_images, maps_per_layers,image_location = '1st_row_1st_col')
+        
+    return fake_images
 
 def merge_patches_into_image(patches, num_rows=3, num_cols=3, device='cpu'):
     """
