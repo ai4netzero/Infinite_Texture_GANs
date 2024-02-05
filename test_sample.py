@@ -3,7 +3,7 @@ import torch
 from collections import OrderedDict
 from torchvision.utils import save_image
 
-from  utils import sample_from_gen_PatchByPatch_test
+from  utils import sample_from_gen_PatchByPatch_test,sample_from_gen
 from models import generators
 
 
@@ -14,6 +14,7 @@ parser.add_argument('--output_resolution_height', type=int, default=384,help = '
 parser.add_argument('--output_resolution_width', type=int, default= 384,help = 'output_resolution_width')
 parser.add_argument('--output_name', type=str, default= '241_generated.jpg',help = 'name of the generated image ')
 parser.add_argument('--model_path', type=str, default= 'results/241_lp_bn_outerpadRepl/300__ema.pth',help = 'path of the generator network')
+parser.add_argument('--tiles',default= False,action='store_true',help = 'use tiling of the input')
 
 args_sample = parser.parse_args()          
 
@@ -46,13 +47,19 @@ netG = generators.ResidualPatchGenerator(z_dim = args.z_dim,G_ch = args.G_ch,bas
                                          num_patches_h = 3,num_patches_w=3,padding_size = 1,conv_reduction = 2).to(device)
 
 
-     
+
 netG = load_G(state_dict_G,netG)
 
 
+
 with torch.no_grad():
-    img = sample_from_gen_PatchByPatch_test(netG,z_dim = args.z_dim,num_images=1,output_resolution_height=args_sample.output_resolution_height
+    if args.padding_mode == 'local':
+        img = sample_from_gen_PatchByPatch_test(netG,z_dim = args.z_dim,num_images=1,output_resolution_height=args_sample.output_resolution_height
                                             ,output_resolution_width=args_sample.output_resolution_width,device=device).cpu()
+    else:
+        scale = (2**(netG.n_layers_G-1))
+        new_base_res = args_sample.output_resolution_height//scale
+        img = sample_from_gen(netG,z_dim = args.z_dim,base_res=new_base_res,num_images=1,tiles=args_sample.tiles,device=device).cpu()
 
     
 #im_np = np.round(im_np)

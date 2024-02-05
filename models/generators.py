@@ -84,6 +84,9 @@ class ResidualPatchGenerator(nn.Module):
         
 
     def forward(self, z,maps=None,image_location = '1st_row_1st_col'):
+        
+        if maps == None:
+            maps = [None]*self.n_layers_G
             
         h = self.start(z,image_location) # x
         

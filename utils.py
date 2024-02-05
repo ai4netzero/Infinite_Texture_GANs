@@ -1,3 +1,4 @@
+import math
 import torch.nn.functional as F
 import time
 import argparse
@@ -394,6 +395,79 @@ def sample_from_gen_PatchByPatch_test(netG,z_dim=128,base_res=4,map_dim = 1,num_
     return full_image
     
     
+
+def tile_process(img,model,scale= 4,tile_size = 32,tile_pad = 8):
+        """It will first crop input images to tiles, and then process each tile.
+        Finally, all the processed tiles are merged into one images.
+
+        Modified from: https://github.com/ata4/esrgan-launcher
+        And then modified from https://github.com/xinntao/Real-ESRGAN/
+        """
+        
+        # img here is the input z
+        batch, _, height, width = img.shape 
+        output_height = height * scale
+        output_width = width * scale
+        
+        output_shape = (batch, 3, output_height, output_width)
+
+        # start with black image
+        output = img.new_zeros(output_shape)
+        tiles_x = math.ceil(width / tile_size)
+        tiles_y = math.ceil(height / tile_size)
+        
+        # loop over all tiles
+        for y in range(tiles_y):
+            for x in range(tiles_x):
+                # extract tile from input image
+                ofs_x = x * tile_size
+                ofs_y = y * tile_size
+                # input tile area on total image
+                input_start_x = ofs_x
+                input_end_x = min(ofs_x + tile_size, width)
+                input_start_y = ofs_y
+                input_end_y = min(ofs_y + tile_size, height)
+
+                # input tile area on total image with padding
+                input_start_x_pad = max(input_start_x - tile_pad, 0)
+                input_end_x_pad = min(input_end_x + tile_pad, width)
+                input_start_y_pad = max(input_start_y - tile_pad, 0)
+                input_end_y_pad = min(input_end_y + tile_pad, height)
+
+                # input tile dimensions
+                input_tile_width = input_end_x - input_start_x
+                input_tile_height = input_end_y - input_start_y
+                tile_idx = y * tiles_x + x + 1
+                input_tile = img[:, :, input_start_y_pad:input_end_y_pad, input_start_x_pad:input_end_x_pad]
+
+                #print(input_tile.shape)
+                # upscale tile
+                try:
+                    with torch.no_grad():
+                        output_tile = model(input_tile)
+                except RuntimeError as error:
+                    print('Error', error)
+                
+                # output tile area on total image
+                output_start_x = input_start_x * scale
+                output_end_x = input_end_x * scale
+                output_start_y = input_start_y * scale
+                output_end_y = input_end_y * scale
+
+                # output tile area without padding
+                output_start_x_tile = (input_start_x - input_start_x_pad) * scale
+                output_end_x_tile = output_start_x_tile + input_tile_width * scale
+                output_start_y_tile = (input_start_y - input_start_y_pad) * scale
+                output_end_y_tile = output_start_y_tile + input_tile_height * scale
+
+                
+                output[:, :, output_start_y:output_end_y,
+                            output_start_x:output_end_x] = output_tile[:, :, output_start_y_tile:output_end_y_tile,
+                                                                       output_start_x_tile:output_end_x_tile]
+                            
+        return output
+
+
     
 
 def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num_images=1, num_patches_height=3, num_patches_width=3,device ='cpu'): 
@@ -451,7 +525,7 @@ def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num
     return fake_images
 
 
-def sample_from_gen(netG,z_dim=128,base_res=4,num_images=1,device ='cpu'): 
+def sample_from_gen(netG,z_dim=128,base_res=4,num_images=1,tiles = False,device ='cpu'): 
     """  
         Generate images using the generator network netG in a patch-by-patch fashion during training.
 
@@ -477,7 +551,11 @@ def sample_from_gen(netG,z_dim=128,base_res=4,num_images=1,device ='cpu'):
 
     maps_per_layers = [None]*n_layers_G
     
-    fake_images = netG(z_images, maps_per_layers,image_location = '1st_row_1st_col')
+    if tiles:
+        scale = (2**(n_layers_G-1))
+        fake_images = tile_process(z_images,netG,scale,32,16)
+    else:
+        fake_images = netG(z_images, maps_per_layers,image_location = '1st_row_1st_col')
         
     return fake_images
 
