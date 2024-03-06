@@ -525,7 +525,7 @@ def sample_from_gen_PatchByPatch_train(netG,z_dim=128,base_res=4,map_dim = 1,num
     return fake_images
 
 
-def sample_from_gen(netG,z_dim=128,base_res=4,num_images=1,tiles = False,device ='cpu'): 
+def sample_from_gen(netG,z_dim=128,base_res=4,map_dim =1,num_images=1,tiles = False,device ='cpu'): 
     """  
         Generate images using the generator network netG in a patch-by-patch fashion during training.
 
@@ -543,13 +543,26 @@ def sample_from_gen(netG,z_dim=128,base_res=4,num_images=1,tiles = False,device 
         
     if isinstance(netG, nn.DataParallel): 
         n_layers_G =  netG.module.n_layers_G
+        type_norm = netG.module.type_norm
     else:
         n_layers_G =  netG.n_layers_G
-                
+        type_norm = netG.type_norm
+        
     #Build the spatial latent input z 
     z_images =  torch.randn(num_images,z_dim,base_res,base_res).to(device)
 
-    maps_per_layers = [None]*n_layers_G
+
+    #Build the second input M for stochastic spatial modulation
+    if type_norm == 'SSM':
+        maps_per_layers = []
+        for i in range(0,n_layers_G):
+            res_layer = (2**i)*base_res            
+            maps_images =  torch.randn(num_images,map_dim,res_layer,res_layer).to(device)
+            
+            maps_per_layers.append((maps_images))
+    else:
+        maps_per_layers = [None]*n_layers_G
+
     
     if tiles:
         scale = (2**(n_layers_G-1))

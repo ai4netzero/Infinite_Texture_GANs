@@ -201,22 +201,27 @@ def conv1x1(ch_in,ch_out,SN = False,s = 1,p=0,bias = True):
  
         
 class StochasticSpatialModulation(nn.Module):
-    def __init__(self,in_channel, map_dim,SN=False):
+    def __init__(self,in_channel, map_dim,SN=False,padding_mode = 'zeros'):
         super().__init__()
         
         self.in_channel = in_channel
         
         # The output number of channels is double in the input to account fot both the bias and variance
         self.out_channels = in_channel*2
+        
+        if padding_mode == 'zeros':
+            p = 1
+        else:
+            p = 0
 
 
         self.bn = nn.BatchNorm2d(in_channel, affine=False)  # no learning parameters
         
-        self.mlp_shared = nn.Sequential(conv3x3(map_dim, 128,SN=SN,p=0).apply(utils.init_weight),
+        self.mlp_shared = nn.Sequential(conv3x3(map_dim, 128,SN=SN,p=p).apply(utils.init_weight),
                                         nn.ReLU()
                                         )
         
-        self.embed = conv3x3(128, self.out_channels,bias = True,SN=SN,p=0).apply(utils.init_weight)       
+        self.embed = conv3x3(128, self.out_channels,bias = True,SN=SN,p=p).apply(utils.init_weight)       
         nn.init.orthogonal_(self.embed.weight.data[:, :in_channel], gain=1)
         self.embed.weight.data[:, in_channel:].zero_()
 
@@ -274,10 +279,10 @@ class ResBlockGenerator(nn.Module):
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(hidden_channels)
         elif self.type_norm == 'SSM':                
-            self.bn1 = StochasticSpatialModulation(in_channels,self.map_dim,self.SN)
-            self.bn2 = StochasticSpatialModulation(hidden_channels,self.map_dim,self.SN)
+            self.bn1 = StochasticSpatialModulation(in_channels,self.map_dim,self.SN,padding_mode)
+            self.bn2 = StochasticSpatialModulation(hidden_channels,self.map_dim,self.SN,padding_mode)
             if self.learnable_sc:
-                self.bn3 = StochasticSpatialModulation(in_channels,self.map_dim,self.SN)
+                self.bn3 = StochasticSpatialModulation(in_channels,self.map_dim,self.SN,padding_mode)
         # TODO 
         # throw an exception if the type_norm is not correct
 
