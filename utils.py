@@ -123,6 +123,8 @@ def prepare_parser():
                         ,help = 'the index of a gpu to be used if --ngpu is 1 ')
     parser.add_argument('--gpu_list', nargs='+', default=None,type=int
                         ,help='list of devices to used in parallizatation if ngpu > 1')
+    parser.add_argument('--num_workers', type=int, default=2
+                        ,help = 'number of workers to be used') 
                         
     # folder name             
     parser.add_argument('--fname', type=str, default='models_cp',help='folder name to save cp')
@@ -183,7 +185,7 @@ def prepare_data(args):
 
     dataloader = torch.utils.data.DataLoader(train_data,
                        shuffle=True, batch_size=args.batch_size,
-                       num_workers=2)
+                       num_workers=args.num_workers)
 
     print("Finished data loading")    
     return dataloader,train_data
