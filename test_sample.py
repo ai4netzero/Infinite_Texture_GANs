@@ -68,7 +68,6 @@ with torch.no_grad():
         img = sample_from_gen_PatchByPatch_test(netG,z_dim = args.z_dim,num_images=1,output_resolution_height=args_sample.output_resolution_height
                                             ,output_resolution_width=args_sample.output_resolution_width,device=device).cpu()
     else:
-        print('single pass')
         scale = (2**(netG.n_layers_G-1))
         new_base_res = args_sample.output_resolution_height//scale
         img = sample_from_gen(netG,z_dim = args.z_dim,base_res=new_base_res,num_images=1,tiles=args_sample.tiles,device=device).cpu()
