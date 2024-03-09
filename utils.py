@@ -123,7 +123,7 @@ def prepare_parser():
                         ,help = 'the index of a gpu to be used if --ngpu is 1 ')
     parser.add_argument('--gpu_list', nargs='+', default=None,type=int
                         ,help='list of devices to used in parallizatation if ngpu > 1')
-    parser.add_argument('--num_workers', type=int, default=2
+    parser.add_argument('--num_workers', type=int, default=0
                         ,help = 'number of workers to be used') 
                         
     # folder name             

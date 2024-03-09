@@ -41,14 +41,15 @@ python train.py --data_path datasets/241.jpg --attention --leak_G 0.02 --samplin
 
 To run the model with SSM set  ``` --type_norm SSM ```
 
-Make sure to replace datasets/241.jpg with the path to your image. Adjust other hyper-parameters according to your requirements. Below is some of hyper-parameters we found to work in some experiments.
+Make sure to replace datasets/241.jpg with the path to your image. Adjust other hyper-parameters according to your requirements. Below is some of hyper-parameters we found to work in some experiments. For most experiments setting num_images =8 ,num_workers=0 works well.
 
- Experiment | Image     | Random Crop | n_layers_G | n_layers_D |
+ Experiment | Image     | Random Crop | n_layers_G | n_layers_D | 
 |------------|-----------|-------------|------------|------------|
 | Experiment 1 | 241.jpg   | 192       | 6          | 4          |
 | Experiment 2 | 34.jpg    | 128       | 5          | 4          |
 | Experiment 3 | 12.jpg    | 128       | 5          | 3          |
 | Experiment 4 | 73.jpg    | 128       | 5          | 3          |
+| Experiment 5 | 417.jpg    | 48       | 4          | 3          |
 
 
 ## Inference
