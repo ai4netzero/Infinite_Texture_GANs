@@ -2,7 +2,7 @@
 Infinite Generation of single texture images using patch-by-patch GAN
 
 This repository contains the codebase for the paper "Local Padding in Patch-Based GANs for Seamless Infinite-Sized Texture Synthesis", https://arxiv.org/abs/2309.02340,
-The aim of this project is to generate high-quality texture patterns with infinite resolution using GANs.
+The aim of this project is to generate high-quality texture patterns with infinite resolution using GANs. This local padding also eliminate tiling in super-resolution images please see https://github.com/Alhasan-Abdellatif/Real-ESRGAN-lp
 
 
 ![alt text](https://github.com/ai4netzero/Infinite_Texture_GANs/blob/main/examples/res_diff_examples.png)
